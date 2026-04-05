@@ -75,6 +75,30 @@ body {
   gap: 12px;
 }
 
+.view-links {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.view-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 1px solid rgba(125, 51, 17, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 247, 233, 0.82);
+  color: var(--accent-strong);
+  text-decoration: none;
+  font-weight: 600;
+  box-shadow: 0 8px 20px rgba(125, 51, 17, 0.08);
+}
+
+.view-link.is-active {
+  background: linear-gradient(180deg, #ffe3c4, #ffd6af);
+}
+
 .topbar-meta p,
 .panel-heading p {
   margin: 0;
@@ -165,6 +189,11 @@ button:hover {
 .svg-mount svg {
   max-width: none;
   overflow: visible;
+}
+
+.canvas-host canvas {
+  display: block;
+  max-width: none;
 }
 
 .empty-state {

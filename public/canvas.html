@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Flow Chart Lab</title>
+    <title>Flow Chart Lab Canvas</title>
     <link rel="stylesheet" href="/styles.css">
   </head>
   <body>
@@ -15,11 +15,11 @@
         </div>
         <div class="topbar-meta">
           <nav class="view-links" aria-label="Renderer views">
-            <a class="view-link is-active" href="/">SVG view</a>
-            <a class="view-link" href="/canvas.html">Canvas view</a>
+            <a class="view-link" href="/">SVG view</a>
+            <a class="view-link is-active" href="/canvas.html">Canvas view</a>
           </nav>
           <button id="resetSample" type="button">Load sample</button>
-          <p>SVG is generated locally in your browser.</p>
+          <p>Canvas is generated locally in your browser.</p>
         </div>
       </header>
 
@@ -34,17 +34,19 @@
 
         <section class="panel preview-panel">
           <div class="panel-heading">
-            <h2>SVG Flow Chart</h2>
+            <h2>Canvas Flow Chart</h2>
             <p id="statusText">Ready.</p>
           </div>
           <div class="preview-scroll">
-            <div id="svgMount" class="svg-mount" aria-live="polite"></div>
+            <div id="canvasHost" class="svg-mount canvas-host" aria-live="polite">
+              <canvas id="chartCanvas"></canvas>
+            </div>
           </div>
         </section>
       </main>
     </div>
 
     <script src="/flowchart-core.js"></script>
-    <script src="/app.js"></script>
+    <script src="/canvas-app.js"></script>
   </body>
 </html>
