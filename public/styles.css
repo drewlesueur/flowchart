@@ -188,6 +188,40 @@ button:hover {
   padding: 18px;
 }
 
+.create-file-form {
+  display: grid;
+  gap: 10px;
+  padding: 18px 18px 0;
+}
+
+.create-file-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+.field-label,
+.form-status {
+  margin: 0;
+  color: var(--muted);
+}
+
+.create-file-form input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid rgba(125, 51, 17, 0.18);
+  border-radius: 16px;
+  padding: 12px 14px;
+  background: rgba(255, 252, 246, 0.96);
+  color: var(--ink);
+  font: inherit;
+}
+
+.create-file-form input:focus {
+  outline: 2px solid rgba(187, 90, 42, 0.22);
+  outline-offset: 1px;
+}
+
 .sample-card {
   display: grid;
   gap: 12px;
@@ -310,6 +344,10 @@ button:hover {
 
   .topbar-meta {
     align-items: start;
+  }
+
+  .create-file-row {
+    grid-template-columns: 1fr;
   }
 
   .workspace {

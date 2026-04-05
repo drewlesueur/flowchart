@@ -37,6 +37,14 @@
             <h2>Files</h2>
             <p id="listStatus">Loading sample files...</p>
           </div>
+          <form id="createFileForm" class="create-file-form">
+            <label class="field-label" for="newFileName">New file name</label>
+            <div class="create-file-row">
+              <input id="newFileName" name="newFileName" type="text" placeholder="example-flow.js" autocomplete="off">
+              <button type="submit">Create file</button>
+            </div>
+            <p id="createFileStatus" class="form-status">Use letters, numbers, `.`, `_`, and `-`.</p>
+          </form>
           <div id="sampleList" class="sample-list" aria-live="polite"></div>
         </section>
       </main>
