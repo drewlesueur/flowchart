@@ -637,8 +637,8 @@
     const elseSize = measureItems(statement.elseBranch);
     const leftWidth = Math.max(thenSize.width, STYLE.emptyBranchWidth);
     const rightWidth = Math.max(elseSize.width, STYLE.emptyBranchWidth);
-    const thenCenter = cx - (STYLE.branchGap / 2 + rightWidth / 2);
-    const elseCenter = cx + (STYLE.branchGap / 2 + leftWidth / 2);
+    const thenCenter = cx - (STYLE.branchGap / 2 + leftWidth / 2);
+    const elseCenter = cx + (STYLE.branchGap / 2 + rightWidth / 2);
     const branchTop = node.y + node.height + STYLE.gapY;
     const thenLayout = layoutItems(model, statement.thenBranch, thenCenter, branchTop);
     const elseLayout = layoutItems(model, statement.elseBranch, elseCenter, branchTop);
