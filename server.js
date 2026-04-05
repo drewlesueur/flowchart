@@ -1,4 +1,4 @@
-const http = require("http");
+const https = require("https");
 const fs = require("fs");
 const path = require("path");
 
@@ -36,6 +36,8 @@ function loadEnvFile() {
 loadEnvFile();
 
 const PORT = Number(process.env.PORT || 3000);
+const CERT_FILE = process.env.CERT_FILE;
+const KEY_FILE = process.env.KEY_FILE;
 const PUBLIC_DIR = path.join(__dirname, "public");
 
 const MIME_TYPES = {
@@ -59,7 +61,21 @@ function resolvePath(urlPath) {
   return resolved;
 }
 
-const server = http.createServer((req, res) => {
+function requireEnv(name, value) {
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+}
+
+requireEnv("CERT_FILE", CERT_FILE);
+requireEnv("KEY_FILE", KEY_FILE);
+
+const tlsOptions = {
+  cert: fs.readFileSync(CERT_FILE),
+  key: fs.readFileSync(KEY_FILE),
+};
+
+const server = https.createServer(tlsOptions, (req, res) => {
   const filePath = resolvePath(req.url || "/");
 
   if (!filePath) {
@@ -84,5 +100,5 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`Flow chart app running at http://localhost:${PORT}`);
+  console.log(`Flow chart app running at https://localhost:${PORT}`);
 });
