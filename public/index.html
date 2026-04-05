@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Flow Chart Lab</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Flow Chart Lab</p>
+          <h1>Paste code. Inspect the control flow.</h1>
+        </div>
+        <div class="topbar-meta">
+          <button id="resetSample" type="button">Load sample</button>
+          <p>SVG is generated locally in your browser.</p>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <section class="panel editor-panel">
+          <div class="panel-heading">
+            <h2>Source</h2>
+            <p>JavaScript-style control flow works best.</p>
+          </div>
+          <textarea id="sourceInput" spellcheck="false" aria-label="Source code input"></textarea>
+        </section>
+
+        <section class="panel preview-panel">
+          <div class="panel-heading">
+            <h2>SVG Flow Chart</h2>
+            <p id="statusText">Ready.</p>
+          </div>
+          <div class="preview-scroll">
+            <div id="svgMount" class="svg-mount" aria-live="polite"></div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
