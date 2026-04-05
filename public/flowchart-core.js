@@ -514,8 +514,12 @@
     return { width: node.width, height: node.height };
   }
 
-  function createEdge(points, label = "") {
-    return { points, label };
+  function createEdge(points, label = "", options = {}) {
+    return {
+      points,
+      label,
+      markerEnd: options.markerEnd !== false,
+    };
   }
 
   function createModel() {
@@ -588,6 +592,25 @@
           to,
         ],
         label
+      )
+    );
+  }
+
+  function connectReturnToMerge(model, from, to) {
+    if (from.x === to.x) {
+      model.edges.push(createEdge([from, to], "", { markerEnd: false }));
+      return;
+    }
+
+    model.edges.push(
+      createEdge(
+        [
+          from,
+          { x: from.x, y: to.y },
+          to,
+        ],
+        "",
+        { markerEnd: false }
       )
     );
   }
@@ -681,11 +704,11 @@
     }
 
     if (thenLayout.open && thenLayout.exit) {
-      connectOrthogonal(model, thenLayout.exit, { x: cx, y: mergeY }, thenLayout.exit.x);
+      connectReturnToMerge(model, thenLayout.exit, { x: cx, y: mergeY });
     }
 
     if (elseLayout.open && elseLayout.exit) {
-      connectOrthogonal(model, elseLayout.exit, { x: cx, y: mergeY }, elseLayout.exit.x);
+      connectReturnToMerge(model, elseLayout.exit, { x: cx, y: mergeY });
     }
 
     const open = thenLayout.open || elseLayout.open || (!statement.thenBranch.length && !statement.elseBranch.length);
@@ -876,8 +899,10 @@
       ? `<text x="${labelPoint.x + 8}" y="${labelPoint.y - 8}" fill="${CHART_COLORS.edgeLabel}" font-size="12">${escapeHtml(edge.label)}</text>`
       : "";
 
+    const markerEnd = edge.markerEnd ? ' marker-end="url(#arrowhead)"' : "";
+
     return `<g class="edge">
-      <path d="${path}" fill="none" stroke="${CHART_COLORS.edge}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowhead)"/>
+      <path d="${path}" fill="none" stroke="${CHART_COLORS.edge}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"${markerEnd}/>
       ${label}
     </g>`;
   }
@@ -957,24 +982,26 @@
     }
     ctx.stroke();
 
-    const end = edge.points[edge.points.length - 1];
-    const prev = edge.points[edge.points.length - 2] || end;
-    const angle = Math.atan2(end.y - prev.y, end.x - prev.x);
-    const arrowLength = 10;
-    const arrowAngle = Math.PI / 7;
+    if (edge.markerEnd !== false) {
+      const end = edge.points[edge.points.length - 1];
+      const prev = edge.points[edge.points.length - 2] || end;
+      const angle = Math.atan2(end.y - prev.y, end.x - prev.x);
+      const arrowLength = 10;
+      const arrowAngle = Math.PI / 7;
 
-    ctx.beginPath();
-    ctx.moveTo(end.x, end.y);
-    ctx.lineTo(
-      end.x - arrowLength * Math.cos(angle - arrowAngle),
-      end.y - arrowLength * Math.sin(angle - arrowAngle)
-    );
-    ctx.lineTo(
-      end.x - arrowLength * Math.cos(angle + arrowAngle),
-      end.y - arrowLength * Math.sin(angle + arrowAngle)
-    );
-    ctx.closePath();
-    ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(end.x, end.y);
+      ctx.lineTo(
+        end.x - arrowLength * Math.cos(angle - arrowAngle),
+        end.y - arrowLength * Math.sin(angle - arrowAngle)
+      );
+      ctx.lineTo(
+        end.x - arrowLength * Math.cos(angle + arrowAngle),
+        end.y - arrowLength * Math.sin(angle + arrowAngle)
+      );
+      ctx.closePath();
+      ctx.fill();
+    }
 
     if (edge.label) {
       const labelPoint = edge.points[Math.floor(edge.points.length / 2)];
