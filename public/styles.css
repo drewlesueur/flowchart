@@ -38,6 +38,10 @@ body {
   padding: 24px 0 32px;
 }
 
+.topbar-home h1 {
+  max-width: 14ch;
+}
+
 .topbar {
   display: flex;
   justify-content: space-between;
@@ -84,6 +88,7 @@ body {
 .view-link {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   min-height: 40px;
   padding: 8px 14px;
   border: 1px solid rgba(125, 51, 17, 0.16);
@@ -96,6 +101,17 @@ body {
 }
 
 .view-link.is-active {
+  background: linear-gradient(180deg, #ffe3c4, #ffd6af);
+}
+
+.view-toggle {
+  border: 1px solid rgba(125, 51, 17, 0.16);
+  background: rgba(255, 247, 233, 0.82);
+  color: var(--accent-strong);
+  box-shadow: 0 8px 20px rgba(125, 51, 17, 0.08);
+}
+
+.view-toggle.is-active {
   background: linear-gradient(180deg, #ffe3c4, #ffd6af);
 }
 
@@ -128,6 +144,12 @@ button:hover {
   min-height: calc(100vh - 170px);
 }
 
+.library-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.6fr) minmax(420px, 1.4fr);
+  gap: 18px;
+}
+
 .panel {
   display: flex;
   flex-direction: column;
@@ -148,6 +170,62 @@ button:hover {
   padding: 20px 22px 14px;
   border-bottom: 1px solid var(--line);
   background: linear-gradient(180deg, rgba(255, 248, 236, 0.95), rgba(255, 251, 243, 0.72));
+}
+
+.panel-heading-stack {
+  align-items: start;
+}
+
+.library-copy {
+  padding: 20px 22px 24px;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.sample-list {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+
+.sample-card {
+  display: grid;
+  gap: 12px;
+  padding: 18px 20px;
+  border-radius: 24px;
+  border: 1px solid rgba(125, 51, 17, 0.16);
+  background: linear-gradient(180deg, rgba(255, 250, 241, 0.96), rgba(255, 240, 221, 0.9));
+  color: inherit;
+  text-decoration: none;
+  box-shadow: 0 12px 26px rgba(67, 43, 16, 0.08);
+}
+
+.sample-card:hover {
+  transform: translateY(-2px);
+}
+
+.sample-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.sample-card-head h3 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.sample-card p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.sample-pill,
+.sample-open {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--accent-strong);
 }
 
 .editor-panel textarea {
@@ -186,6 +264,11 @@ button:hover {
   padding: 24px;
 }
 
+#svgMount {
+  display: grid;
+  place-items: start center;
+}
+
 .svg-mount svg {
   max-width: none;
   overflow: visible;
@@ -219,6 +302,7 @@ button:hover {
 
   .topbar,
   .workspace,
+  .library-layout,
   .panel-heading {
     grid-template-columns: 1fr;
     display: grid;

@@ -1,0 +1,20 @@
+[
+  {
+    "id": "order-fulfillment.js",
+    "name": "order-fulfillment.js",
+    "language": "JavaScript",
+    "description": "Order approval, item checks, and final shipment."
+  },
+  {
+    "id": "incident-triage.js",
+    "name": "incident-triage.js",
+    "language": "JavaScript",
+    "description": "Escalation rules for urgent incidents and recovery steps."
+  },
+  {
+    "id": "deploy-pipeline.js",
+    "name": "deploy-pipeline.js",
+    "language": "JavaScript",
+    "description": "Build, test, deploy, and rollback decisions in a release pipeline."
+  }
+]

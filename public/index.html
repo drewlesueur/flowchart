@@ -8,43 +8,40 @@
   </head>
   <body>
     <div class="page-shell">
-      <header class="topbar">
+      <header class="topbar topbar-home">
         <div>
           <p class="eyebrow">Flow Chart Lab</p>
-          <h1>Paste code. Inspect the control flow.</h1>
+          <h1>Browse code files and open a flow chart detail view.</h1>
         </div>
-        <div class="topbar-meta">
-          <nav class="view-links" aria-label="Renderer views">
-            <a class="view-link is-active" href="/">SVG view</a>
-            <a class="view-link" href="/canvas.html">Canvas view</a>
-          </nav>
-          <button id="resetSample" type="button">Load sample</button>
-          <p>SVG is generated locally in your browser.</p>
+        <div class="topbar-meta topbar-meta-home">
+          <p>The detail page lets you flip between SVG and Canvas rendering.</p>
         </div>
       </header>
 
-      <main class="workspace">
-        <section class="panel editor-panel">
-          <div class="panel-heading">
-            <h2>Source</h2>
-            <p>JavaScript-style control flow works best.</p>
+      <main class="library-layout">
+        <section class="library-intro panel">
+          <div class="panel-heading panel-heading-stack">
+            <h2>Code File Library</h2>
+            <p>Choose a sample file to inspect its control flow.</p>
           </div>
-          <textarea id="sourceInput" spellcheck="false" aria-label="Source code input"></textarea>
+          <div class="library-copy">
+            <p>
+              Each file opens in an editor-backed detail page where you can tweak the code, regenerate the chart,
+              and switch the renderer without leaving the page.
+            </p>
+          </div>
         </section>
 
-        <section class="panel preview-panel">
-          <div class="panel-heading">
-            <h2>SVG Flow Chart</h2>
-            <p id="statusText">Ready.</p>
+        <section class="sample-list-panel panel">
+          <div class="panel-heading panel-heading-stack">
+            <h2>Files</h2>
+            <p id="listStatus">Loading sample files...</p>
           </div>
-          <div class="preview-scroll">
-            <div id="svgMount" class="svg-mount" aria-live="polite"></div>
-          </div>
+          <div id="sampleList" class="sample-list" aria-live="polite"></div>
         </section>
       </main>
     </div>
 
-    <script src="/flowchart-core.js"></script>
-    <script src="/app.js"></script>
+    <script src="/list.js"></script>
   </body>
 </html>
