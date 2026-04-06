@@ -19,6 +19,24 @@ return
   assert.deepEqual(result.stack, []);
 });
 
+test("explicit >name binding pops from the stack into locals", () => {
+  const source = `
+greet:
+>lastName
+>firstName
+"Hello Mr. " firstName concat lastName concat say
+return
+`;
+
+  const result = TrickleScript.run(source, {
+    entry: "greet",
+    stack: ["Drew ", "LeSueur"]
+  });
+
+  assert.deepEqual(result.output, ["Hello Mr. Drew LeSueur"]);
+  assert.deepEqual(result.stack, []);
+});
+
 test("conditional goto skips block when condition is false", () => {
   const source = `
 main:

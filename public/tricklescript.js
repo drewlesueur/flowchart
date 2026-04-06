@@ -176,6 +176,7 @@
   function inferRoutineParams(routine, allRoutines) {
     const routineNames = new Set(allRoutines.map((entry) => entry.name));
     const labelNames = new Set(Object.keys(routine.labels));
+    const explicitStores = [];
     const params = [];
 
     function remember(name) {
@@ -189,6 +190,12 @@
         if (token.type !== "word") continue;
         const word = token.value;
 
+        if (word.startsWith(">") && word.length > 1) {
+          const name = word.slice(1);
+          if (!explicitStores.includes(name)) explicitStores.push(name);
+          continue;
+        }
+
         if (BUILTINS.has(word) || routineNames.has(word) || labelNames.has(word)) continue;
         if (word === "return" || word === "true" || word === "false") continue;
         if (/^-?\d+(?:\.\d+)?$/.test(word)) continue;
@@ -196,7 +203,8 @@
       }
     }
 
-    routine.params = params;
+    routine.storeParams = explicitStores.slice();
+    routine.params = explicitStores.length > 0 ? [] : params;
   }
 
   function validateRoutine(routine) {
@@ -293,6 +301,11 @@
       }
 
       for (const token of instruction.tokens) {
+        if (token.type === "word" && token.value.startsWith(">") && token.value.length > 1) {
+          frame.locals[token.value.slice(1)] = stack.pop();
+          continue;
+        }
+
         const value = coerceLiteral(token, frame, program, options);
 
         if (value && value.builtin) {
