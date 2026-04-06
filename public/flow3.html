@@ -7,38 +7,48 @@
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background:
-    radial-gradient(circle at top left, #f1e2c8 0, #ead2a8 26%, #d9b77f 60%, #c89754 100%);
-  color: #2b1806;
+  background: #1a1a2e;
+  color: #e0e0e0;
 }
 header {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 14px 18px;
-  border-bottom: 1px solid rgba(71, 40, 10, 0.28);
-  background: rgba(255, 248, 233, 0.72);
-  backdrop-filter: blur(8px);
+  gap: 12px;
+  padding: 10px 20px;
+  border-bottom: 1px solid #0f3460;
+  background: #16213e;
 }
 header h1 {
-  font-size: 20px;
-  letter-spacing: 0.03em;
+  font-size: 16px;
+  font-weight: 600;
+  color: #e94560;
 }
 header button {
-  border: 1px solid #5f3a12;
-  background: #5f3a12;
-  color: #f8f0df;
-  padding: 8px 14px;
-  border-radius: 999px;
+  border: none;
+  background: #e94560;
+  color: #fff;
+  padding: 5px 14px;
+  border-radius: 4px;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 13px;
 }
 header button:hover {
-  background: #744818;
+  background: #c73650;
+}
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #888;
+  user-select: none;
+}
+.toggle input {
+  accent-color: #e94560;
 }
 .container {
   flex: 1;
@@ -47,13 +57,13 @@ header button:hover {
   min-height: 0;
 }
 .pane-title {
-  padding: 8px 14px;
+  padding: 8px 12px;
   text-transform: uppercase;
-  letter-spacing: 0.12em;
-  font-size: 11px;
-  border-bottom: 1px solid rgba(71, 40, 10, 0.18);
-  color: #70441b;
-  background: rgba(255, 248, 233, 0.55);
+  letter-spacing: 1px;
+  font-size: 12px;
+  border-bottom: 1px solid #0f3460;
+  color: #888;
+  background: #16213e;
 }
 .left, .right {
   min-height: 0;
@@ -61,27 +71,23 @@ header button:hover {
   flex-direction: column;
 }
 .left {
-  border-right: 1px solid rgba(71, 40, 10, 0.2);
-  background: rgba(255, 250, 240, 0.42);
+  border-right: 1px solid #0f3460;
 }
 textarea {
   flex: 1;
   width: 100%;
   border: none;
   resize: none;
-  padding: 16px;
-  background: rgba(255, 249, 239, 0.72);
-  color: #241304;
+  padding: 12px;
+  background: #0a0a1a;
+  color: #e0e0e0;
   font: 14px/1.5 "Courier New", monospace;
   outline: none;
   tab-size: 2;
 }
 .right {
   overflow: auto;
-  background:
-    linear-gradient(rgba(255,255,255,0.2), rgba(255,255,255,0.06)),
-    repeating-linear-gradient(0deg, rgba(96, 60, 20, 0.05) 0, rgba(96, 60, 20, 0.05) 1px, transparent 1px, transparent 32px),
-    repeating-linear-gradient(90deg, rgba(96, 60, 20, 0.04) 0, rgba(96, 60, 20, 0.04) 1px, transparent 1px, transparent 32px);
+  background: #12122a;
 }
 #svgContainer {
   min-width: 100%;
@@ -90,7 +96,7 @@ textarea {
 .status {
   margin-left: auto;
   font-size: 12px;
-  color: #70441b;
+  color: #888;
 }
 @media (max-width: 900px) {
   .container {
@@ -99,7 +105,7 @@ textarea {
   }
   .left {
     border-right: none;
-    border-bottom: 1px solid rgba(71, 40, 10, 0.2);
+    border-bottom: 1px solid #0f3460;
   }
 }
 </style>
@@ -108,6 +114,10 @@ textarea {
 <header>
   <h1>JS to Flowchart</h1>
   <button id="generateBtn">Generate</button>
+  <label class="toggle">
+    <input id="yesLeft" type="checkbox">
+    <span>Yes On Left</span>
+  </label>
   <div class="status" id="status">Ready</div>
 </header>
 <div class="container">
@@ -131,6 +141,7 @@ textarea {
   const NS = 'http://www.w3.org/2000/svg';
   const codeEl = document.getElementById('code');
   const generateBtn = document.getElementById('generateBtn');
+  const yesLeftEl = document.getElementById('yesLeft');
   const svgContainer = document.getElementById('svgContainer');
   const statusEl = document.getElementById('status');
 
@@ -406,7 +417,7 @@ textarea {
     return { width, rows: Math.max(1, rows) };
   }
 
-  function layout(ast, graph) {
+  function layout(ast, graph, options) {
     measureItems(ast);
 
     const positions = {};
@@ -460,8 +471,9 @@ textarea {
         if (item.kind === 'decision') {
           const nodeId = consumeNode(TYPES.DECISION, item.label);
           placeNode(nodeId, col, row);
-          const noCol = col;
-          const yesCol = col + item._noWidth;
+          const yesOnLeft = options && options.yesOnLeft;
+          const yesCol = yesOnLeft ? col : col + item._noWidth;
+          const noCol = yesOnLeft ? col + item._yesWidth : col;
           placeSequence(item.noItems, noCol, row + 1);
           placeSequence(item.yesItems, yesCol, row + 1);
           row += item._rows;
@@ -492,19 +504,20 @@ textarea {
     return { positions, totalWidth, totalHeight };
   }
 
-  function decisionPath(from, to, label) {
+  function decisionPath(from, to, label, options) {
     const fromCx = from.x + from.w / 2;
     const fromCy = from.y + from.h / 2;
     const toCx = to.x + to.w / 2;
     const toTop = to.y;
+    const yesOnLeft = options && options.yesOnLeft;
 
     if (label === 'Yes') {
-      const startX = from.x + from.w + 16;
+      const startX = yesOnLeft ? from.x - 16 : from.x + from.w + 16;
       const startY = fromCy;
-      const laneX = Math.max(startX + 28, toCx);
+      const laneX = yesOnLeft ? Math.min(startX - 28, toCx) : Math.max(startX + 28, toCx);
       return {
         d: `M ${startX} ${startY} L ${laneX} ${startY} L ${laneX} ${toTop}`,
-        labelX: startX + 10,
+        labelX: yesOnLeft ? startX - 30 : startX + 10,
         labelY: startY - 8
       };
     }
@@ -575,7 +588,7 @@ textarea {
     return `M ${startX} ${startY} L ${laneX} ${startY} L ${laneX} ${endY} L ${endX} ${endY}`;
   }
 
-  function render(graph, layoutInfo) {
+  function render(graph, layoutInfo, options) {
     svgContainer.innerHTML = '';
     const svg = el('svg', {
       width: layoutInfo.totalWidth,
@@ -593,7 +606,7 @@ textarea {
       markerHeight: '7',
       orient: 'auto-start-reverse'
     });
-    arrow.appendChild(el('path', { d: 'M 0 0 L 10 5 L 0 10 z', fill: '#5a3412' }));
+    arrow.appendChild(el('path', { d: 'M 0 0 L 10 5 L 0 10 z', fill: '#4a6fa5' }));
     defs.appendChild(arrow);
 
     const arrowSoft = el('marker', {
@@ -605,7 +618,7 @@ textarea {
       markerHeight: '7',
       orient: 'auto-start-reverse'
     });
-    arrowSoft.appendChild(el('path', { d: 'M 0 0 L 10 5 L 0 10 z', fill: '#9f5a1f' }));
+    arrowSoft.appendChild(el('path', { d: 'M 0 0 L 10 5 L 0 10 z', fill: '#e94560' }));
     defs.appendChild(arrowSoft);
     svg.appendChild(defs);
 
@@ -625,12 +638,12 @@ textarea {
       let d = '';
       let labelX = null;
       let labelY = null;
-      let stroke = '#5a3412';
+      let stroke = '#4a6fa5';
       let marker = 'url(#arrow)';
       const fromNode = nodeMap[edge.from];
 
       if (fromNode.type === TYPES.DECISION && (edge.label === 'Yes' || edge.label === 'No')) {
-        const path = decisionPath(from, to, edge.label);
+        const path = decisionPath(from, to, edge.label, options);
         d = path.d;
         labelX = path.labelX;
         labelY = path.labelY;
@@ -641,7 +654,7 @@ textarea {
         labelY = path.labelY;
       } else if (edge.label === 'Again') {
         d = againPath(from, to);
-        stroke = '#9f5a1f';
+        stroke = '#e94560';
         marker = 'url(#arrow-soft)';
       } else {
         const mergeIndex = (incomingOrder[edge.to] || []).indexOf(edge.from);
@@ -661,9 +674,9 @@ textarea {
         svg.appendChild(el('text', {
           x: labelX,
           y: labelY,
-          fill: '#7f2f13',
-          'font-size': '12',
-          'font-family': 'Georgia, serif'
+          fill: '#e94560',
+          'font-size': '11',
+          'font-family': '-apple-system, sans-serif'
         }, edge.label));
       }
     }
@@ -682,37 +695,37 @@ textarea {
       if (node.type === TYPES.START || node.type === TYPES.END) {
         svg.appendChild(el('rect', {
           x, y, width: w, height: h, rx: h / 2, ry: h / 2,
-          fill: node.type === TYPES.START ? '#f6e6c6' : '#fff5e7',
-          stroke: '#8a4515',
-          'stroke-width': '2.4'
+          fill: node.type === TYPES.START ? '#0f3460' : '#1a1a2e',
+          stroke: '#e94560',
+          'stroke-width': '2'
         }));
       } else if (node.type === TYPES.DECISION) {
         svg.appendChild(el('polygon', {
           points: `${cx},${y - 8} ${x + w + 18},${cy} ${cx},${y + h + 8} ${x - 18},${cy}`,
-          fill: '#fff6ea',
-          stroke: '#b05c1f',
-          'stroke-width': '2.2'
+          fill: '#16213e',
+          stroke: '#e9a645',
+          'stroke-width': '2'
         }));
       } else if (node.type === TYPES.RETURN) {
         svg.appendChild(el('polygon', {
           points: `${x + 14},${y} ${x + w},${y} ${x + w - 14},${y + h} ${x},${y + h}`,
-          fill: '#fff8ec',
-          stroke: '#2f7a46',
+          fill: '#16213e',
+          stroke: '#45e980',
           'stroke-width': '2'
         }));
       } else if (node.type === TYPES.LOOP) {
         svg.appendChild(el('polygon', {
           points: `${x + 18},${y} ${x + w - 18},${y} ${x + w},${cy} ${x + w - 18},${y + h} ${x + 18},${y + h} ${x},${cy}`,
-          fill: '#fff6ea',
-          stroke: '#8d4c16',
+          fill: '#16213e',
+          stroke: '#45b0e9',
           'stroke-width': '2'
         }));
       } else {
         svg.appendChild(el('rect', {
           x, y, width: w, height: h, rx: '6', ry: '6',
-          fill: '#fff8ef',
-          stroke: '#6e4518',
-          'stroke-width': '2'
+          fill: '#16213e',
+          stroke: '#4a6fa5',
+          'stroke-width': '1.5'
         }));
       }
 
@@ -724,8 +737,8 @@ textarea {
         y: cy,
         'text-anchor': 'middle',
         'dominant-baseline': 'middle',
-        fill: '#2b1806',
-        'font-size': '13',
+        fill: '#e0e0e0',
+        'font-size': '12',
         'font-family': '"Courier New", monospace'
       }, label));
     }
@@ -735,6 +748,7 @@ textarea {
 
   function generate() {
     const code = codeEl.value;
+    const options = { yesOnLeft: yesLeftEl.checked };
     if (!code.trim()) {
       svgContainer.innerHTML = '';
       statusEl.textContent = 'Empty input';
@@ -744,8 +758,8 @@ textarea {
     try {
       const ast = parse(code);
       const graph = buildGraph(ast);
-      const layoutInfo = layout(ast, graph);
-      render(graph, layoutInfo);
+      const layoutInfo = layout(ast, graph, options);
+      render(graph, layoutInfo, options);
       statusEl.textContent = graph.nodes.length + ' nodes';
     } catch (error) {
       console.error(error);
@@ -754,6 +768,7 @@ textarea {
   }
 
   generateBtn.addEventListener('click', generate);
+  yesLeftEl.addEventListener('change', generate);
 
   let timer = null;
   codeEl.addEventListener('input', function() {
