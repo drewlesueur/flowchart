@@ -133,27 +133,50 @@ header button:hover { background: #c73650; }
 
           let falsePrev = [cond.id];
           let nextIdx = endBrace + 1;
-          if (nextIdx <= endI) {
-            const nextTrimmed = (lines[nextIdx] || '').trim();
-            if (nextTrimmed.match(/^(?:}\s*)?else\s/)) {
-              setLocalPrev([cond.id]);
-              prev = [cond.id];
-              if (nextTrimmed.match(/else\s+if/)) {
-                processBlock(nextIdx, endI);
-                for (const e of edges) {
-                  if (e.from === cond.id && e.label === '') e.label = 'No';
-                }
-                falsePrev = [...prev];
-                nextIdx = endI + 1;
-              } else {
-                const elseEnd = findMatchingBrace(nextIdx);
-                processBlock(nextIdx + 1, elseEnd - 1);
-                for (const e of edges) {
-                  if (e.from === cond.id && e.label === '') e.label = 'No';
-                }
-                falsePrev = [...prev];
-                nextIdx = elseEnd + 1;
+          // Check for else on the endBrace line itself (e.g. "} else {")
+          // or on the very next line
+          let elseLine = -1;
+          const endBraceTrimmed = (lines[endBrace] || '').trim();
+          if (endBraceTrimmed.match(/}\s*else\s/)) {
+            elseLine = endBrace;
+          } else if (nextIdx <= endI && (lines[nextIdx] || '').trim().match(/^(?:}\s*)?else\s/)) {
+            elseLine = nextIdx;
+          }
+          if (elseLine >= 0) {
+            const elseLineTrimmed = (lines[elseLine] || '').trim();
+            setLocalPrev([cond.id]);
+            prev = [cond.id];
+            if (elseLineTrimmed.match(/else\s+if/)) {
+              processBlock(elseLine, endI);
+              for (const e of edges) {
+                if (e.from === cond.id && e.label === '') e.label = 'No';
               }
+              falsePrev = [...prev];
+              nextIdx = endI + 1;
+            } else {
+              // If elseLine is "} else {", findMatchingBrace would hit the
+              // leading } and return immediately. Scan from next line instead.
+              let elseEnd;
+              if (elseLine === endBrace) {
+                elseEnd = -1;
+                let d = 1;
+                for (let j = elseLine + 1; j < lines.length; j++) {
+                  for (const ch of lines[j]) {
+                    if (ch === '{') d++;
+                    if (ch === '}') { d--; if (d <= 0) { elseEnd = j; break; } }
+                  }
+                  if (elseEnd >= 0) break;
+                }
+                if (elseEnd < 0) elseEnd = lines.length - 1;
+              } else {
+                elseEnd = findMatchingBrace(elseLine);
+              }
+              processBlock(elseLine + 1, elseEnd - 1);
+              for (const e of edges) {
+                if (e.from === cond.id && e.label === '') e.label = 'No';
+              }
+              falsePrev = [...prev];
+              nextIdx = elseEnd + 1;
             }
           }
           setLocalPrev([...truePrev, ...falsePrev]);
