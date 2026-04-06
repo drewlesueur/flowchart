@@ -304,7 +304,6 @@ return</textarea>
         pos.col += xDelta / 230;
 
         for (const edge of outgoing[nodeId] || []) {
-          if (edge.label === "No") continue;
           if (incomingCount[edge.to] > 1) continue;
           queue.push(edge.to);
         }
@@ -319,6 +318,17 @@ return</textarea>
       const xDelta = 60;
       const rowDelta = to.row - from.row;
       shiftBranch(edge.to, Math.max(0, rowDelta), xDelta);
+    }
+
+    for (const edge of graph.edges) {
+      if (edge.label !== "No") continue;
+      const from = positions[edge.from];
+      const to = positions[edge.to];
+      if (!from || !to) continue;
+      const xDelta = from.x - to.x;
+      if (Math.abs(xDelta) > 1) {
+        shiftBranch(edge.to, 0, xDelta);
+      }
     }
 
     const rowValues = Array.from(new Set(Object.values(positions).map((pos) => pos.row))).sort((a, b) => a - b);
