@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JS → Flowchart</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; height: 100vh; display: flex; flex-direction: column; background: #1a1a2e; color: #e0e0e0; }
+header { padding: 10px 20px; background: #16213e; border-bottom: 1px solid #0f3460; display: flex; align-items: center; gap: 12px; }
+header h1 { font-size: 16px; font-weight: 600; color: #e94560; }
+header button { padding: 5px 14px; background: #e94560; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
+header button:hover { background: #c73650; }
+.container { display: flex; flex: 1; overflow: hidden; }
+.left { width: 40%; display: flex; flex-direction: column; border-right: 1px solid #0f3460; }
+.left label { padding: 8px 12px; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #888; background: #16213e; }
+.left textarea { flex: 1; resize: none; background: #0a0a1a; color: #e0e0e0; border: none; padding: 12px; font-family: 'Courier New', monospace; font-size: 14px; line-height: 1.5; outline: none; tab-size: 2; }
+.right { flex: 1; overflow: auto; background: #12122a; position: relative; }
+.right svg { display: block; }
+</style>
+</head>
+<body>
+<header>
+  <h1>JS → Flowchart</h1>
+  <button id="genBtn">Generate</button>
+</header>
+<div class="container">
+  <div class="left">
+    <label>JavaScript Code</label>
+    <textarea id="code" spellcheck="false" placeholder="Paste JavaScript code here...">function greet(name) {
+  if (name === "world") {
+    console.log("Hello, world!");
+  } else {
+    console.log("Hi, " + name);
+  }
+  for (let i = 0; i < 3; i++) {
+    console.log(i);
+  }
+  return true;
+}</textarea>
+  </div>
+  <div class="right" id="svgContainer"></div>
+</div>
+<script>
+(function() {
+  const codeEl = document.getElementById('code');
+  const svgContainer = document.getElementById('svgContainer');
+  const genBtn = document.getElementById('genBtn');
+  const NS = 'http://www.w3.org/2000/svg';
+
+  // ── Parsing ──────────────────────────────────────────────
+
+  const T = { START: 'start', END: 'end', PROCESS: 'process', DECISION: 'decision', IO: 'io', LOOP: 'loop' };
+
+  function parse(code) {
+    const lines = code.split('\n');
+    const nodes = [];
+    const edges = [];
+    let id = 0;
+    const nid = () => 'n' + (id++);
+
+    function addNode(type, label) {
+      const n = { id: nid(), type, label };
+      nodes.push(n);
+      return n;
+    }
+
+    function addEdge(from, to, label) {
+      edges.push({ from, to, label: label || '' });
+    }
+
+    const startNode = addNode(T.START, 'Start');
+    let prev = [startNode.id];
+
+    function connectPrev(targetId, label) {
+      for (const p of prev) addEdge(p, targetId, label || '');
+    }
+
+    function findMatchingBrace(startIdx) {
+      let depth = 0;
+      for (let j = startIdx; j < lines.length; j++) {
+        const t = lines[j].trim();
+        for (const ch of t) {
+          if (ch === '{') depth++;
+          if (ch === '}') { depth--; if (depth <= 0) return j; }
+        }
+      }
+      return lines.length - 1;
+    }
+
+    function processBlock(startI, endI) {
+      let localPrev = [...prev];
+
+      function setLocalPrev(ids) { localPrev = ids; prev = ids; }
+      function connectLocal(targetId, label) {
+        for (const p of localPrev) addEdge(p, targetId, label || '');
+      }
+
+      let idx = startI;
+      while (idx <= endI) {
+        const raw = lines[idx];
+        if (!raw) { idx++; continue; }
+        const trimmed = raw.trim();
+        if (!trimmed || trimmed === '{' || trimmed === '}') { idx++; continue; }
+
+        const ifMatch = trimmed.match(/^(?:}\s*)?(?:else\s+)?if\s*\((.+?)\)\s*\{?\s*$/);
+        const elseMatch = trimmed.match(/^(?:}\s*)?else\s*\{?\s*$/);
+        const forMatch = trimmed.match(/^for\s*\((.+?)\)\s*\{?\s*$/);
+        const whileMatch = trimmed.match(/^while\s*\((.+?)\)\s*\{?\s*$/);
+        const funcMatch = trimmed.match(/^(?:async\s+)?function\s+(\w+)\s*\(([^)]*)\)\s*\{?\s*$/);
+        const retMatch = trimmed.match(/^return\b(.*)$/);
+
+        if (funcMatch) {
+          const n = addNode(T.PROCESS, `function ${funcMatch[1]}(${funcMatch[2]})`);
+          connectLocal(n.id);
+          setLocalPrev([n.id]);
+          const endBrace = findMatchingBrace(idx);
+          processBlock(idx + 1, endBrace - 1);
+          localPrev = [...prev];
+          idx = endBrace + 1;
+        } else if (ifMatch && !elseMatch) {
+          const cond = addNode(T.DECISION, ifMatch[1]);
+          connectLocal(cond.id);
+
+          const endBrace = findMatchingBrace(idx);
+          setLocalPrev([cond.id]);
+          prev = [cond.id];
+          processBlock(idx + 1, endBrace - 1);
+          for (const e of edges) {
+            if (e.from === cond.id && !e.label) e.label = 'Yes';
+          }
+          const truePrev = [...prev];
+
+          let falsePrev = [cond.id];
+          let nextIdx = endBrace + 1;
+          if (nextIdx <= endI) {
+            const nextTrimmed = (lines[nextIdx] || '').trim();
+            if (nextTrimmed.match(/^(?:}\s*)?else\s/)) {
+              setLocalPrev([cond.id]);
+              prev = [cond.id];
+              if (nextTrimmed.match(/else\s+if/)) {
+                processBlock(nextIdx, endI);
+                for (const e of edges) {
+                  if (e.from === cond.id && e.label === '') e.label = 'No';
+                }
+                falsePrev = [...prev];
+                nextIdx = endI + 1;
+              } else {
+                const elseEnd = findMatchingBrace(nextIdx);
+                processBlock(nextIdx + 1, elseEnd - 1);
+                for (const e of edges) {
+                  if (e.from === cond.id && e.label === '') e.label = 'No';
+                }
+                falsePrev = [...prev];
+                nextIdx = elseEnd + 1;
+              }
+            }
+          }
+          setLocalPrev([...truePrev, ...falsePrev]);
+          let hasFalseEdge = false;
+          for (const e of edges) {
+            if (e.from === cond.id && e.label === 'No') hasFalseEdge = true;
+          }
+          if (!hasFalseEdge) {
+            for (const e of edges) {
+              if (e.from === cond.id && e.label === '') { e.label = 'No'; break; }
+            }
+          }
+          idx = nextIdx;
+        } else if (forMatch) {
+          const loopNode = addNode(T.LOOP, `for (${forMatch[1]})`);
+          connectLocal(loopNode.id);
+          const endBrace = findMatchingBrace(idx);
+          setLocalPrev([loopNode.id]);
+          prev = [loopNode.id];
+          processBlock(idx + 1, endBrace - 1);
+          for (const p of prev) addEdge(p, loopNode.id, 'loop');
+          setLocalPrev([loopNode.id]);
+          idx = endBrace + 1;
+        } else if (whileMatch) {
+          const loopNode = addNode(T.DECISION, `while (${whileMatch[1]})`);
+          connectLocal(loopNode.id);
+          const endBrace = findMatchingBrace(idx);
+          setLocalPrev([loopNode.id]);
+          prev = [loopNode.id];
+          processBlock(idx + 1, endBrace - 1);
+          for (const p of prev) addEdge(p, loopNode.id, 'loop');
+          setLocalPrev([loopNode.id]);
+          idx = endBrace + 1;
+        } else if (retMatch) {
+          const n = addNode(T.IO, 'return' + (retMatch[1] ? ' ' + retMatch[1].trim().replace(/;$/, '') : ''));
+          connectLocal(n.id);
+          setLocalPrev([n.id]);
+          idx++;
+        } else if (!elseMatch) {
+          const label = trimmed.replace(/;$/, '').replace(/^\{/, '').replace(/\}$/, '').trim();
+          if (label && label !== '{' && label !== '}') {
+            const n = addNode(T.PROCESS, label);
+            connectLocal(n.id);
+            setLocalPrev([n.id]);
+          }
+          idx++;
+        } else {
+          idx++;
+        }
+      }
+      prev = localPrev;
+    }
+
+    processBlock(0, lines.length - 1);
+
+    const endNode = addNode(T.END, 'End');
+    connectPrev(endNode.id);
+
+    return { nodes, edges };
+  }
+
+  // ── Layout ──────────────────────────────────────────────
+
+  function layout(graph) {
+    const { nodes, edges } = graph;
+
+    const children = {};
+    const parents = {};
+    for (const n of nodes) { children[n.id] = []; parents[n.id] = []; }
+    for (const e of edges) {
+      if (e.label === 'loop') continue;
+      children[e.from].push(e.to);
+      parents[e.to].push(e.from);
+    }
+
+    const layers = {};
+    const queue = [nodes[0].id];
+    layers[nodes[0].id] = 0;
+    const visited = new Set([nodes[0].id]);
+    while (queue.length) {
+      const cur = queue.shift();
+      for (const c of children[cur]) {
+        if (!visited.has(c)) {
+          visited.add(c);
+          layers[c] = (layers[cur] || 0) + 1;
+          queue.push(c);
+        }
+      }
+    }
+    for (const n of nodes) {
+      if (!(n.id in layers)) layers[n.id] = (nodes.length - 1);
+    }
+
+    const layerGroups = {};
+    for (const n of nodes) {
+      const l = layers[n.id];
+      if (!layerGroups[l]) layerGroups[l] = [];
+      layerGroups[l].push(n.id);
+    }
+
+    const NODE_W = 180;
+    const NODE_H = 50;
+    const PAD_X = 60;
+    const PAD_Y = 70;
+    const MARGIN = 40;
+
+    const positions = {};
+    const sortedLayers = Object.keys(layerGroups).map(Number).sort((a, b) => a - b);
+    let maxWidth = 0;
+
+    for (const l of sortedLayers) {
+      const group = layerGroups[l];
+      const totalW = group.length * NODE_W + (group.length - 1) * PAD_X;
+      if (totalW > maxWidth) maxWidth = totalW;
+    }
+
+    for (const l of sortedLayers) {
+      const group = layerGroups[l];
+      const totalW = group.length * NODE_W + (group.length - 1) * PAD_X;
+      const startX = MARGIN + (maxWidth - totalW) / 2;
+      for (let j = 0; j < group.length; j++) {
+        positions[group[j]] = {
+          x: startX + j * (NODE_W + PAD_X),
+          y: MARGIN + l * (NODE_H + PAD_Y),
+          w: NODE_W,
+          h: NODE_H
+        };
+      }
+    }
+
+    const totalHeight = MARGIN * 2 + (sortedLayers.length) * (NODE_H + PAD_Y);
+    const totalWidth = MARGIN * 2 + maxWidth;
+
+    return { positions, totalWidth, totalHeight, NODE_W, NODE_H };
+  }
+
+  // ── SVG Rendering ───────────────────────────────────────
+
+  function el(tag, attrs, children) {
+    const e = document.createElementNS(NS, tag);
+    if (attrs) for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+    if (children) {
+      if (typeof children === 'string') e.textContent = children;
+      else for (const c of children) e.appendChild(c);
+    }
+    return e;
+  }
+
+  function render(graph, layoutInfo) {
+    const { nodes, edges } = graph;
+    const { positions, totalWidth, totalHeight } = layoutInfo;
+
+    svgContainer.innerHTML = '';
+
+    const svg = el('svg', {
+      width: totalWidth,
+      height: totalHeight,
+      viewBox: `0 0 ${totalWidth} ${totalHeight}`,
+      xmlns: NS
+    });
+
+    // Defs for arrowheads
+    const defs = el('defs');
+    const marker = el('marker', {
+      id: 'arrow', viewBox: '0 0 10 10', refX: '10', refY: '5',
+      markerWidth: '8', markerHeight: '8', orient: 'auto-start-reverse', fill: '#4a6fa5'
+    });
+    marker.appendChild(el('path', { d: 'M 0 0 L 10 5 L 0 10 z' }));
+    defs.appendChild(marker);
+
+    const markerLoop = el('marker', {
+      id: 'arrow-loop', viewBox: '0 0 10 10', refX: '10', refY: '5',
+      markerWidth: '8', markerHeight: '8', orient: 'auto-start-reverse', fill: '#e94560', opacity: '0.55'
+    });
+    markerLoop.appendChild(el('path', { d: 'M 0 0 L 10 5 L 0 10 z' }));
+    defs.appendChild(markerLoop);
+
+    svg.appendChild(defs);
+
+    // Draw edges
+    for (const e of edges) {
+      const from = positions[e.from];
+      const to = positions[e.to];
+      if (!from || !to) continue;
+
+      const fromCx = from.x + from.w / 2;
+      const fromCy = from.y + from.h / 2;
+      const toCx = to.x + to.w / 2;
+      const toCy = to.y + to.h / 2;
+
+      if (e.label === 'loop') {
+        const x1 = from.x + from.w;
+        const y1 = fromCy;
+        const x2 = to.x + to.w;
+        const y2 = toCy;
+        const bulge = 40;
+        const path = el('path', {
+          d: `M ${x1} ${y1} C ${x1 + bulge} ${y1}, ${x2 + bulge} ${y2}, ${x2} ${y2}`,
+          stroke: '#e94560', 'stroke-opacity': '0.55', 'stroke-width': '1.5',
+          'stroke-dasharray': '4 4', fill: 'none', 'marker-end': 'url(#arrow-loop)'
+        });
+        svg.appendChild(path);
+        continue;
+      }
+
+      let x1, y1, x2, y2;
+      if (toCy > fromCy) {
+        x1 = fromCx; y1 = from.y + from.h;
+        x2 = toCx; y2 = to.y;
+      } else {
+        x1 = fromCx; y1 = from.y;
+        x2 = toCx; y2 = to.y + to.h;
+      }
+
+      let d;
+      if (Math.abs(x1 - x2) < 2) {
+        d = `M ${x1} ${y1} L ${x2} ${y2}`;
+      } else {
+        const midY = (y1 + y2) / 2;
+        d = `M ${x1} ${y1} L ${x1} ${midY} L ${x2} ${midY} L ${x2} ${y2}`;
+      }
+
+      svg.appendChild(el('path', {
+        d, stroke: '#4a6fa5', 'stroke-width': '1.5', fill: 'none', 'marker-end': 'url(#arrow)'
+      }));
+
+      // Edge label
+      if (e.label && e.label !== 'loop') {
+        const midX = (x1 + x2) / 2 + 4;
+        const midY = (y1 + y2) / 2 - 4;
+        svg.appendChild(el('text', {
+          x: midX, y: midY, fill: '#e94560',
+          'font-size': '11', 'font-family': '-apple-system, sans-serif'
+        }, e.label));
+      }
+    }
+
+    // Draw nodes
+    const nodeMap = {};
+    for (const n of nodes) nodeMap[n.id] = n;
+
+    for (const n of nodes) {
+      const pos = positions[n.id];
+      if (!pos) continue;
+
+      const { x, y, w, h } = pos;
+      const cx = x + w / 2;
+      const cy = y + h / 2;
+
+      let shape;
+      let strokeColor;
+
+      switch (n.type) {
+        case T.START:
+        case T.END:
+          shape = el('rect', {
+            x, y, width: w, height: h, rx: h / 2, ry: h / 2,
+            fill: n.type === T.START ? '#0f3460' : '#1a1a2e',
+            stroke: '#e94560', 'stroke-width': '2'
+          });
+          strokeColor = '#e94560';
+          break;
+        case T.DECISION: {
+          const pts = `${cx},${y - 5} ${x + w + 15},${cy} ${cx},${y + h + 5} ${x - 15},${cy}`;
+          shape = el('polygon', {
+            points: pts, fill: '#16213e', stroke: '#e9a645', 'stroke-width': '2'
+          });
+          strokeColor = '#e9a645';
+          break;
+        }
+        case T.IO: {
+          const skew = 12;
+          const pts = `${x + skew},${y} ${x + w},${y} ${x + w - skew},${y + h} ${x},${y + h}`;
+          shape = el('polygon', {
+            points: pts, fill: '#16213e', stroke: '#45e980', 'stroke-width': '2'
+          });
+          strokeColor = '#45e980';
+          break;
+        }
+        case T.LOOP: {
+          const ind = 15;
+          const pts = `${x + ind},${y} ${x + w - ind},${y} ${x + w},${cy} ${x + w - ind},${y + h} ${x + ind},${y + h} ${x},${cy}`;
+          shape = el('polygon', {
+            points: pts, fill: '#16213e', stroke: '#45b0e9', 'stroke-width': '2'
+          });
+          strokeColor = '#45b0e9';
+          break;
+        }
+        default:
+          shape = el('rect', {
+            x, y, width: w, height: h,
+            fill: '#16213e', stroke: '#4a6fa5', 'stroke-width': '1.5'
+          });
+          strokeColor = '#4a6fa5';
+      }
+
+      svg.appendChild(shape);
+
+      // Label — truncate to fit
+      let label = n.label;
+      const maxChars = Math.floor(w / 7.5);
+      if (label.length > maxChars) label = label.slice(0, maxChars - 1) + '\u2026';
+
+      svg.appendChild(el('text', {
+        x: cx, y: cy, fill: '#e0e0e0',
+        'font-size': '12', 'font-family': '"Courier New", monospace',
+        'text-anchor': 'middle', 'dominant-baseline': 'central'
+      }, label));
+    }
+
+    svgContainer.appendChild(svg);
+  }
+
+  // ── Main ────────────────────────────────────────────────
+
+  function generate() {
+    const code = codeEl.value;
+    if (!code.trim()) {
+      svgContainer.innerHTML = '';
+      return;
+    }
+    try {
+      const graph = parse(code);
+      const info = layout(graph);
+      render(graph, info);
+    } catch (err) {
+      console.error('Flowchart generation error:', err);
+    }
+  }
+
+  genBtn.addEventListener('click', generate);
+
+  let debounceTimer;
+  codeEl.addEventListener('input', () => {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(generate, 400);
+  });
+
+  codeEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const start = codeEl.selectionStart;
+      const end = codeEl.selectionEnd;
+      codeEl.value = codeEl.value.substring(0, start) + '  ' + codeEl.value.substring(end);
+      codeEl.selectionStart = codeEl.selectionEnd = start + 2;
+    }
+  });
+
+  generate();
+})();
+</script>
+</body>
+</html>
