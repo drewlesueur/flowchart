@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JS to Flowchart</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: Georgia, "Times New Roman", serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background:
+    radial-gradient(circle at top left, #f1e2c8 0, #ead2a8 26%, #d9b77f 60%, #c89754 100%);
+  color: #2b1806;
+}
+header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(71, 40, 10, 0.28);
+  background: rgba(255, 248, 233, 0.72);
+  backdrop-filter: blur(8px);
+}
+header h1 {
+  font-size: 20px;
+  letter-spacing: 0.03em;
+}
+header button {
+  border: 1px solid #5f3a12;
+  background: #5f3a12;
+  color: #f8f0df;
+  padding: 8px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 14px;
+}
+header button:hover {
+  background: #744818;
+}
+.container {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(320px, 42%) 1fr;
+  min-height: 0;
+}
+.pane-title {
+  padding: 8px 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 11px;
+  border-bottom: 1px solid rgba(71, 40, 10, 0.18);
+  color: #70441b;
+  background: rgba(255, 248, 233, 0.55);
+}
+.left, .right {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.left {
+  border-right: 1px solid rgba(71, 40, 10, 0.2);
+  background: rgba(255, 250, 240, 0.42);
+}
+textarea {
+  flex: 1;
+  width: 100%;
+  border: none;
+  resize: none;
+  padding: 16px;
+  background: rgba(255, 249, 239, 0.72);
+  color: #241304;
+  font: 14px/1.5 "Courier New", monospace;
+  outline: none;
+  tab-size: 2;
+}
+.right {
+  overflow: auto;
+  background:
+    linear-gradient(rgba(255,255,255,0.2), rgba(255,255,255,0.06)),
+    repeating-linear-gradient(0deg, rgba(96, 60, 20, 0.05) 0, rgba(96, 60, 20, 0.05) 1px, transparent 1px, transparent 32px),
+    repeating-linear-gradient(90deg, rgba(96, 60, 20, 0.04) 0, rgba(96, 60, 20, 0.04) 1px, transparent 1px, transparent 32px);
+}
+#svgContainer {
+  min-width: 100%;
+  min-height: 100%;
+}
+.status {
+  margin-left: auto;
+  font-size: 12px;
+  color: #70441b;
+}
+@media (max-width: 900px) {
+  .container {
+    grid-template-columns: 1fr;
+    grid-template-rows: 44vh 1fr;
+  }
+  .left {
+    border-right: none;
+    border-bottom: 1px solid rgba(71, 40, 10, 0.2);
+  }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>JS to Flowchart</h1>
+  <button id="generateBtn">Generate</button>
+  <div class="status" id="status">Ready</div>
+</header>
+<div class="container">
+  <section class="left">
+    <div class="pane-title">JavaScript</div>
+    <textarea id="code" spellcheck="false">if (x == 3) {
+  doThing()
+} else if (y == 2) {
+  doOtherThing()
+} else {
+  doThirdThing()
+}</textarea>
+  </section>
+  <section class="right">
+    <div class="pane-title">Flowchart</div>
+    <div id="svgContainer"></div>
+  </section>
+</div>
+<script>
+(function() {
+  const NS = 'http://www.w3.org/2000/svg';
+  const codeEl = document.getElementById('code');
+  const generateBtn = document.getElementById('generateBtn');
+  const svgContainer = document.getElementById('svgContainer');
+  const statusEl = document.getElementById('status');
+
+  const TYPES = {
+    START: 'start',
+    END: 'end',
+    PROCESS: 'process',
+    DECISION: 'decision',
+    RETURN: 'return',
+    LOOP: 'loop'
+  };
+
+  const COL_GAP = 230;
+  const ROW_GAP = 130;
+  const NODE_W = 170;
+  const NODE_H = 52;
+  const MARGIN_X = 70;
+  const MARGIN_Y = 50;
+
+  function el(tag, attrs, text) {
+    const node = document.createElementNS(NS, tag);
+    if (attrs) {
+      for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, value);
+    }
+    if (typeof text === 'string') node.textContent = text;
+    return node;
+  }
+
+  function splitLines(code) {
+    return code.replace(/\r\n/g, '\n').split('\n');
+  }
+
+  function lineText(lines, index) {
+    return (lines[index] || '').trim();
+  }
+
+  function findMatchingBrace(lines, startIndex) {
+    let depth = 0;
+    let seenOpen = false;
+    for (let i = startIndex; i < lines.length; i++) {
+      const line = lines[i];
+      for (let j = 0; j < line.length; j++) {
+        const ch = line[j];
+        if (ch === '{') {
+          depth++;
+          seenOpen = true;
+        } else if (ch === '}') {
+          if (!seenOpen && i === startIndex) continue;
+          depth--;
+          if (seenOpen && depth === 0) return i;
+        }
+      }
+    }
+    return lines.length - 1;
+  }
+
+  function parse(code) {
+    const lines = splitLines(code);
+
+    function parseRange(start, end) {
+      const items = [];
+      let index = start;
+
+      while (index <= end) {
+        const raw = lines[index];
+        const trimmed = (raw || '').trim();
+        if (!trimmed || trimmed === '{' || trimmed === '}') {
+          index++;
+          continue;
+        }
+
+        const functionMatch = trimmed.match(/^(?:async\s+)?function\s+([A-Za-z_$][\w$]*)\s*\(([^)]*)\)\s*\{?\s*$/);
+        const ifMatch = trimmed.match(/^(?:}\s*)?(?:else\s+)?if\s*\((.+)\)\s*\{?\s*$/);
+        const elseMatch = trimmed.match(/^(?:}\s*)?else\s*\{?\s*$/);
+        const forMatch = trimmed.match(/^for\s*\((.+)\)\s*\{?\s*$/);
+        const whileMatch = trimmed.match(/^while\s*\((.+)\)\s*\{?\s*$/);
+        const returnMatch = trimmed.match(/^return\b(.*)$/);
+
+        if (functionMatch) {
+          const endBrace = findMatchingBrace(lines, index);
+          items.push({
+            kind: 'process',
+            label: 'function ' + functionMatch[1] + '(' + functionMatch[2] + ')'
+          });
+          const inner = parseRange(index + 1, endBrace - 1);
+          items.push.apply(items, inner.items);
+          index = endBrace + 1;
+          continue;
+        }
+
+        if (ifMatch && !elseMatch) {
+          const endBrace = findMatchingBrace(lines, index);
+          const yesBlock = parseRange(index + 1, endBrace - 1).items;
+          let noBlock = [];
+          let nextIndex = endBrace + 1;
+          let elseLine = -1;
+
+          if (/}\s*else\b/.test(lineText(lines, endBrace))) {
+            elseLine = endBrace;
+          } else if (nextIndex <= end && /^(?:}\s*)?else\b/.test(lineText(lines, nextIndex))) {
+            elseLine = nextIndex;
+          }
+
+          if (elseLine >= 0) {
+            const elseText = lineText(lines, elseLine);
+            if (/else\s+if\b/.test(elseText)) {
+              noBlock = parseRange(elseLine, end).items;
+              nextIndex = end + 1;
+            } else {
+              let elseEnd;
+              if (elseLine === endBrace) {
+                elseEnd = findMatchingBrace(lines, elseLine);
+              } else {
+                elseEnd = findMatchingBrace(lines, elseLine);
+              }
+              noBlock = parseRange(elseLine + 1, elseEnd - 1).items;
+              nextIndex = elseEnd + 1;
+            }
+          }
+
+          items.push({
+            kind: 'decision',
+            label: ifMatch[1].trim(),
+            yesItems: yesBlock,
+            noItems: noBlock
+          });
+          index = nextIndex;
+          continue;
+        }
+
+        if (forMatch) {
+          const endBrace = findMatchingBrace(lines, index);
+          items.push({
+            kind: 'loop',
+            label: 'for (' + forMatch[1] + ')',
+            bodyItems: parseRange(index + 1, endBrace - 1).items
+          });
+          index = endBrace + 1;
+          continue;
+        }
+
+        if (whileMatch) {
+          const endBrace = findMatchingBrace(lines, index);
+          items.push({
+            kind: 'loop',
+            label: 'while (' + whileMatch[1] + ')',
+            bodyItems: parseRange(index + 1, endBrace - 1).items
+          });
+          index = endBrace + 1;
+          continue;
+        }
+
+        if (returnMatch) {
+          items.push({
+            kind: 'return',
+            label: 'return' + (returnMatch[1] ? ' ' + returnMatch[1].trim().replace(/;$/, '') : '')
+          });
+          index++;
+          continue;
+        }
+
+        if (!elseMatch) {
+          const label = trimmed.replace(/;$/, '').replace(/^\{/, '').replace(/\}$/, '').trim();
+          if (label) items.push({ kind: 'process', label });
+        }
+        index++;
+      }
+
+      return { items };
+    }
+
+    return parseRange(0, lines.length - 1).items;
+  }
+
+  function buildGraph(ast) {
+    const nodes = [];
+    const edges = [];
+    let counter = 0;
+
+    function addNode(type, label) {
+      const node = { id: 'n' + counter++, type, label };
+      nodes.push(node);
+      return node.id;
+    }
+
+    function addEdge(from, to, label) {
+      edges.push({ from, to, label: label || '' });
+    }
+
+    function connectAll(incoming, targetId) {
+      for (const source of incoming) addEdge(source.id, targetId, source.label || '');
+    }
+
+    function buildSequence(items, incoming, depth) {
+      let current = incoming.slice();
+      let maxDepth = depth;
+
+      for (const item of items) {
+        if (item.kind === 'process') {
+          const nodeId = addNode(TYPES.PROCESS, item.label);
+          connectAll(current, nodeId);
+          current = [{ id: nodeId, label: '', depth }];
+          continue;
+        }
+
+        if (item.kind === 'return') {
+          const nodeId = addNode(TYPES.RETURN, item.label);
+          connectAll(current, nodeId);
+          current = [{ id: nodeId, label: '', depth }];
+          continue;
+        }
+
+        if (item.kind === 'decision') {
+          const nodeId = addNode(TYPES.DECISION, item.label);
+          connectAll(current, nodeId);
+          const yesEntry = [{ id: nodeId, label: 'Yes', depth: depth + 1 }];
+          const noEntry = [{ id: nodeId, label: 'No', depth }];
+          const yesResult = buildSequence(item.yesItems, yesEntry, depth + 1);
+          const noResult = buildSequence(item.noItems, noEntry, depth);
+          current = yesResult.exits.concat(noResult.exits);
+          maxDepth = Math.max(maxDepth, yesResult.maxDepth, noResult.maxDepth);
+          continue;
+        }
+
+        if (item.kind === 'loop') {
+          const loopId = addNode(TYPES.LOOP, item.label);
+          connectAll(current, loopId);
+          const bodyEntry = [{ id: loopId, label: 'Loop', depth: depth + 1 }];
+          const bodyResult = buildSequence(item.bodyItems, bodyEntry, depth + 1);
+          for (const exit of bodyResult.exits) addEdge(exit.id, loopId, 'Again');
+          current = [{ id: loopId, label: 'Done', depth }];
+          maxDepth = Math.max(maxDepth, bodyResult.maxDepth);
+        }
+      }
+
+      return { exits: current, maxDepth };
+    }
+
+    const startId = addNode(TYPES.START, 'Start');
+    const built = buildSequence(ast, [{ id: startId, label: '', depth: 0 }], 0);
+    const endId = addNode(TYPES.END, 'End');
+    connectAll(built.exits, endId);
+
+    return { nodes, edges, startId, endId };
+  }
+
+  function measureItems(items) {
+    let width = 1;
+    let rows = 0;
+
+    for (const item of items) {
+      if (item.kind === 'decision') {
+        const noMeasure = measureItems(item.noItems);
+        const yesMeasure = measureItems(item.yesItems);
+        item._noWidth = Math.max(1, noMeasure.width);
+        item._yesWidth = Math.max(1, yesMeasure.width);
+        item._rows = 2 + Math.max(noMeasure.rows, yesMeasure.rows);
+        width = Math.max(width, item._noWidth + item._yesWidth);
+        rows += item._rows;
+      } else if (item.kind === 'loop') {
+        const bodyMeasure = measureItems(item.bodyItems);
+        item._bodyWidth = Math.max(1, bodyMeasure.width);
+        item._rows = 2 + bodyMeasure.rows;
+        width = Math.max(width, 1 + item._bodyWidth);
+        rows += item._rows;
+      } else {
+        item._rows = 1;
+        width = Math.max(width, 1);
+        rows += 1;
+      }
+    }
+
+    return { width, rows: Math.max(1, rows) };
+  }
+
+  function layout(ast, graph) {
+    measureItems(ast);
+
+    const positions = {};
+    let currentRow = 0;
+    let maxCol = 0;
+
+    function placeNode(id, col, row) {
+      maxCol = Math.max(maxCol, col);
+      positions[id] = {
+        col,
+        row,
+        x: MARGIN_X + col * COL_GAP,
+        y: MARGIN_Y + row * ROW_GAP,
+        w: NODE_W,
+        h: NODE_H
+      };
+    }
+
+    const nodeByLabel = {};
+    const nodeQueue = graph.nodes.slice();
+
+    function consumeNode(type, label) {
+      for (let i = 0; i < nodeQueue.length; i++) {
+        const node = nodeQueue[i];
+        if (node.type === type && node.label === label) {
+          nodeQueue.splice(i, 1);
+          return node.id;
+        }
+      }
+      return null;
+    }
+
+    function placeSequence(items, col, startRow) {
+      let row = startRow;
+
+      for (const item of items) {
+        if (item.kind === 'process') {
+          const nodeId = consumeNode(TYPES.PROCESS, item.label);
+          placeNode(nodeId, col, row);
+          row += 1;
+          continue;
+        }
+
+        if (item.kind === 'return') {
+          const nodeId = consumeNode(TYPES.RETURN, item.label);
+          placeNode(nodeId, col, row);
+          row += 1;
+          continue;
+        }
+
+        if (item.kind === 'decision') {
+          const nodeId = consumeNode(TYPES.DECISION, item.label);
+          placeNode(nodeId, col, row);
+          const noCol = col;
+          const yesCol = col + item._noWidth;
+          placeSequence(item.noItems, noCol, row + 1);
+          placeSequence(item.yesItems, yesCol, row + 1);
+          row += item._rows;
+          continue;
+        }
+
+        if (item.kind === 'loop') {
+          const nodeId = consumeNode(TYPES.LOOP, item.label);
+          placeNode(nodeId, col, row);
+          placeSequence(item.bodyItems, col + 1, row + 1);
+          row += item._rows;
+        }
+      }
+
+      return row;
+    }
+
+    const startId = consumeNode(TYPES.START, 'Start');
+    placeNode(startId, 0, currentRow);
+    currentRow += 1;
+    currentRow = placeSequence(ast, 0, currentRow);
+    const endId = consumeNode(TYPES.END, 'End');
+    placeNode(endId, 0, currentRow);
+
+    const totalWidth = MARGIN_X * 2 + (maxCol + 1) * COL_GAP;
+    const totalHeight = MARGIN_Y * 2 + (currentRow + 1) * ROW_GAP;
+
+    return { positions, totalWidth, totalHeight };
+  }
+
+  function decisionPath(from, to, label) {
+    const fromCx = from.x + from.w / 2;
+    const fromCy = from.y + from.h / 2;
+    const toCx = to.x + to.w / 2;
+    const toTop = to.y;
+
+    if (label === 'Yes') {
+      const startX = from.x + from.w + 16;
+      const startY = fromCy;
+      const laneX = Math.max(startX + 28, toCx);
+      return {
+        d: `M ${startX} ${startY} L ${laneX} ${startY} L ${laneX} ${toTop}`,
+        labelX: startX + 10,
+        labelY: startY - 8
+      };
+    }
+
+    const startX = fromCx;
+    const startY = from.y + from.h + 6;
+    if (Math.abs(startX - toCx) < 2) {
+      return {
+        d: `M ${startX} ${startY} L ${toCx} ${toTop}`,
+        labelX: startX + 8,
+        labelY: startY + 16
+      };
+    }
+    const bendY = toTop - 22;
+    return {
+      d: `M ${startX} ${startY} L ${startX} ${bendY} L ${toCx} ${bendY} L ${toCx} ${toTop}`,
+      labelX: startX + 8,
+      labelY: startY + 16
+    };
+  }
+
+  function normalPath(from, to, mergeIndex) {
+    const fromCx = from.x + from.w / 2;
+    const fromBottom = from.y + from.h;
+    const toCx = to.x + to.w / 2;
+    const toTop = to.y;
+
+    if (Math.abs(fromCx - toCx) < 2) {
+      return `M ${fromCx} ${fromBottom} L ${toCx} ${toTop}`;
+    }
+
+    const laneY = Math.max(fromBottom + 18, toTop - 26 - mergeIndex * 10);
+    return `M ${fromCx} ${fromBottom} L ${fromCx} ${laneY} L ${toCx} ${laneY} L ${toCx} ${toTop}`;
+  }
+
+  function loopPath(from, to, label) {
+    const fromCx = from.x + from.w / 2;
+    const fromCy = from.y + from.h / 2;
+    const toCx = to.x + to.w / 2;
+    const toCy = to.y + to.h / 2;
+
+    if (label === 'Loop') {
+      const startX = from.x + from.w + 16;
+      const startY = fromCy;
+      const laneX = Math.max(startX + 26, toCx);
+      return {
+        d: `M ${startX} ${startY} L ${laneX} ${startY} L ${laneX} ${to.y}`,
+        labelX: startX + 8,
+        labelY: startY - 8
+      };
+    }
+
+    const startX = fromCx;
+    const startY = from.y + from.h + 6;
+    return {
+      d: `M ${startX} ${startY} L ${toCx} ${to.y}`,
+      labelX: startX + 8,
+      labelY: startY + 16
+    };
+  }
+
+  function againPath(from, to) {
+    const startX = from.x + from.w;
+    const startY = from.y + from.h / 2;
+    const endX = to.x + to.w;
+    const endY = to.y + to.h / 2;
+    const laneX = Math.max(startX, endX) + 34;
+    return `M ${startX} ${startY} L ${laneX} ${startY} L ${laneX} ${endY} L ${endX} ${endY}`;
+  }
+
+  function render(graph, layoutInfo) {
+    svgContainer.innerHTML = '';
+    const svg = el('svg', {
+      width: layoutInfo.totalWidth,
+      height: layoutInfo.totalHeight,
+      viewBox: `0 0 ${layoutInfo.totalWidth} ${layoutInfo.totalHeight}`
+    });
+
+    const defs = el('defs');
+    const arrow = el('marker', {
+      id: 'arrow',
+      viewBox: '0 0 10 10',
+      refX: '10',
+      refY: '5',
+      markerWidth: '7',
+      markerHeight: '7',
+      orient: 'auto-start-reverse'
+    });
+    arrow.appendChild(el('path', { d: 'M 0 0 L 10 5 L 0 10 z', fill: '#5a3412' }));
+    defs.appendChild(arrow);
+
+    const arrowSoft = el('marker', {
+      id: 'arrow-soft',
+      viewBox: '0 0 10 10',
+      refX: '10',
+      refY: '5',
+      markerWidth: '7',
+      markerHeight: '7',
+      orient: 'auto-start-reverse'
+    });
+    arrowSoft.appendChild(el('path', { d: 'M 0 0 L 10 5 L 0 10 z', fill: '#9f5a1f' }));
+    defs.appendChild(arrowSoft);
+    svg.appendChild(defs);
+
+    const nodeMap = {};
+    const incomingOrder = {};
+    for (const node of graph.nodes) nodeMap[node.id] = node;
+    for (const edge of graph.edges) {
+      if (!incomingOrder[edge.to]) incomingOrder[edge.to] = [];
+      incomingOrder[edge.to].push(edge.from);
+    }
+
+    for (const edge of graph.edges) {
+      const from = layoutInfo.positions[edge.from];
+      const to = layoutInfo.positions[edge.to];
+      if (!from || !to) continue;
+
+      let d = '';
+      let labelX = null;
+      let labelY = null;
+      let stroke = '#5a3412';
+      let marker = 'url(#arrow)';
+      const fromNode = nodeMap[edge.from];
+
+      if (fromNode.type === TYPES.DECISION && (edge.label === 'Yes' || edge.label === 'No')) {
+        const path = decisionPath(from, to, edge.label);
+        d = path.d;
+        labelX = path.labelX;
+        labelY = path.labelY;
+      } else if (fromNode.type === TYPES.LOOP && (edge.label === 'Loop' || edge.label === 'Done')) {
+        const path = loopPath(from, to, edge.label);
+        d = path.d;
+        labelX = path.labelX;
+        labelY = path.labelY;
+      } else if (edge.label === 'Again') {
+        d = againPath(from, to);
+        stroke = '#9f5a1f';
+        marker = 'url(#arrow-soft)';
+      } else {
+        const mergeIndex = (incomingOrder[edge.to] || []).indexOf(edge.from);
+        d = normalPath(from, to, Math.max(0, mergeIndex));
+      }
+
+      svg.appendChild(el('path', {
+        d,
+        fill: 'none',
+        stroke,
+        'stroke-width': edge.label === 'Again' ? '1.6' : '2',
+        'stroke-dasharray': edge.label === 'Again' ? '6 4' : '',
+        'marker-end': marker
+      }));
+
+      if (edge.label && edge.label !== 'Again') {
+        svg.appendChild(el('text', {
+          x: labelX,
+          y: labelY,
+          fill: '#7f2f13',
+          'font-size': '12',
+          'font-family': 'Georgia, serif'
+        }, edge.label));
+      }
+    }
+
+    for (const node of graph.nodes) {
+      const pos = layoutInfo.positions[node.id];
+      if (!pos) continue;
+
+      const x = pos.x;
+      const y = pos.y;
+      const w = pos.w;
+      const h = pos.h;
+      const cx = x + w / 2;
+      const cy = y + h / 2;
+
+      if (node.type === TYPES.START || node.type === TYPES.END) {
+        svg.appendChild(el('rect', {
+          x, y, width: w, height: h, rx: h / 2, ry: h / 2,
+          fill: node.type === TYPES.START ? '#f6e6c6' : '#fff5e7',
+          stroke: '#8a4515',
+          'stroke-width': '2.4'
+        }));
+      } else if (node.type === TYPES.DECISION) {
+        svg.appendChild(el('polygon', {
+          points: `${cx},${y - 8} ${x + w + 18},${cy} ${cx},${y + h + 8} ${x - 18},${cy}`,
+          fill: '#fff6ea',
+          stroke: '#b05c1f',
+          'stroke-width': '2.2'
+        }));
+      } else if (node.type === TYPES.RETURN) {
+        svg.appendChild(el('polygon', {
+          points: `${x + 14},${y} ${x + w},${y} ${x + w - 14},${y + h} ${x},${y + h}`,
+          fill: '#fff8ec',
+          stroke: '#2f7a46',
+          'stroke-width': '2'
+        }));
+      } else if (node.type === TYPES.LOOP) {
+        svg.appendChild(el('polygon', {
+          points: `${x + 18},${y} ${x + w - 18},${y} ${x + w},${cy} ${x + w - 18},${y + h} ${x + 18},${y + h} ${x},${cy}`,
+          fill: '#fff6ea',
+          stroke: '#8d4c16',
+          'stroke-width': '2'
+        }));
+      } else {
+        svg.appendChild(el('rect', {
+          x, y, width: w, height: h, rx: '6', ry: '6',
+          fill: '#fff8ef',
+          stroke: '#6e4518',
+          'stroke-width': '2'
+        }));
+      }
+
+      let label = node.label;
+      const maxChars = 25;
+      if (label.length > maxChars) label = label.slice(0, maxChars - 1) + '\u2026';
+      svg.appendChild(el('text', {
+        x: cx,
+        y: cy,
+        'text-anchor': 'middle',
+        'dominant-baseline': 'middle',
+        fill: '#2b1806',
+        'font-size': '13',
+        'font-family': '"Courier New", monospace'
+      }, label));
+    }
+
+    svgContainer.appendChild(svg);
+  }
+
+  function generate() {
+    const code = codeEl.value;
+    if (!code.trim()) {
+      svgContainer.innerHTML = '';
+      statusEl.textContent = 'Empty input';
+      return;
+    }
+
+    try {
+      const ast = parse(code);
+      const graph = buildGraph(ast);
+      const layoutInfo = layout(ast, graph);
+      render(graph, layoutInfo);
+      statusEl.textContent = graph.nodes.length + ' nodes';
+    } catch (error) {
+      console.error(error);
+      statusEl.textContent = 'Parse error';
+    }
+  }
+
+  generateBtn.addEventListener('click', generate);
+
+  let timer = null;
+  codeEl.addEventListener('input', function() {
+    clearTimeout(timer);
+    timer = setTimeout(generate, 220);
+  });
+
+  codeEl.addEventListener('keydown', function(event) {
+    if (event.key === 'Tab') {
+      event.preventDefault();
+      const start = codeEl.selectionStart;
+      const end = codeEl.selectionEnd;
+      codeEl.value = codeEl.value.slice(0, start) + '  ' + codeEl.value.slice(end);
+      codeEl.selectionStart = codeEl.selectionEnd = start + 2;
+    }
+  });
+
+  generate();
+})();
+</script>
+</body>
+</html>
