@@ -126,26 +126,13 @@ return</textarea>
     }
 
     if (edge.viaGoto) {
-      const canDropStraightDown =
-        Math.abs(fromCx - toCx) < 2 &&
-        to.y > from.y &&
-        graph.nodes.every((node) => {
-          const pos = graph.positions[node.id];
-          if (!pos || node.id === edge.from || node.id === edge.to) return true;
-          if (pos.y <= from.y || pos.y >= to.y) return true;
-          return fromCx < pos.x || fromCx > pos.x + pos.w;
-        });
-
-      if (canDropStraightDown) {
-        return { d: `M ${fromCx} ${from.y + from.h} L ${toCx} ${to.y}` };
-      }
-
       const startFromRight = VIA_GOTO_EXIT_SIDE === "right";
       const startX = startFromRight ? from.x + from.w : fromCx;
       const startY = startFromRight ? fromCy : from.y + from.h;
       const laneY = startFromRight ? startY : startY + 22;
       const laneX = graph.totalWidth - 70;
       const targetY = toCy;
+
       return {
         d: `M ${startX} ${startY} L ${startX} ${laneY} L ${laneX} ${laneY} L ${laneX} ${targetY} L ${to.x + to.w} ${targetY}`
       };
