@@ -276,13 +276,46 @@ return</textarea>
       positions[id] = { ...pos };
     }
 
+    const outgoing = {};
+    const incomingCount = {};
+    for (const node of graph.nodes) {
+      outgoing[node.id] = [];
+      incomingCount[node.id] = 0;
+    }
+    for (const edge of graph.edges) {
+      outgoing[edge.from].push(edge);
+      incomingCount[edge.to] += 1;
+    }
+
+    function shiftBranch(startId, rowDelta) {
+      const queue = [startId];
+      const seen = new Set();
+
+      while (queue.length) {
+        const nodeId = queue.shift();
+        if (seen.has(nodeId)) continue;
+        seen.add(nodeId);
+
+        const pos = positions[nodeId];
+        if (!pos) continue;
+        pos.row -= rowDelta;
+        pos.y -= rowDelta * 120;
+
+        for (const edge of outgoing[nodeId] || []) {
+          if (edge.label === "No") continue;
+          if (incomingCount[edge.to] > 1) continue;
+          queue.push(edge.to);
+        }
+      }
+    }
+
     for (const edge of graph.edges) {
       if (edge.label !== "Yes") continue;
       const from = positions[edge.from];
       const to = positions[edge.to];
       if (!from || !to) continue;
-      to.row = from.row;
-      to.y = from.y;
+      const rowDelta = to.row - from.row;
+      if (rowDelta > 0) shiftBranch(edge.to, rowDelta);
     }
 
     return { ...graph, positions };
