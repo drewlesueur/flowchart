@@ -250,7 +250,9 @@ header button:hover { background: #c73650; }
 
     const children = {};
     const parents = {};
+    const nodeMap = {};
     for (const n of nodes) { children[n.id] = []; parents[n.id] = []; }
+    for (const n of nodes) nodeMap[n.id] = n;
     for (const e of edges) {
       if (e.label === 'loop') continue;
       children[e.from].push(e.to);
@@ -273,6 +275,31 @@ header button:hover { background: #c73650; }
         layers[c] = Math.max(layers[c], layers[cur] + 1);
         inDeg[c]--;
         if (inDeg[c] === 0) queue.push(c);
+      }
+    }
+
+    const noChainDepth = {};
+    for (const n of nodes) noChainDepth[n.id] = 0;
+    const inDeg2 = {};
+    for (const n of nodes) inDeg2[n.id] = 0;
+    for (const e of edges) {
+      if (e.label === 'loop') continue;
+      inDeg2[e.to]++;
+    }
+    const queue2 = [];
+    for (const n of nodes) {
+      if (inDeg2[n.id] === 0) queue2.push(n.id);
+    }
+    while (queue2.length) {
+      const cur = queue2.shift();
+      for (const e of edges) {
+        if (e.label === 'loop' || e.from !== cur) continue;
+        const nextDepth = e.label === 'No' && nodeMap[cur] && nodeMap[cur].type === T.DECISION
+          ? noChainDepth[cur] + 1
+          : noChainDepth[cur];
+        noChainDepth[e.to] = Math.max(noChainDepth[e.to], nextDepth);
+        inDeg2[e.to]--;
+        if (inDeg2[e.to] === 0) queue2.push(e.to);
       }
     }
 
@@ -314,8 +341,6 @@ header button:hover { background: #c73650; }
     }
 
     // Post-layout: for each decision, put "No" directly below and "Yes" to its right
-    const nodeMap = {};
-    for (const n of nodes) nodeMap[n.id] = n;
     for (const e of edges) {
       if (e.label !== 'No') continue;
       const fromNode = nodeMap[e.from];
@@ -342,7 +367,7 @@ header button:hover { background: #c73650; }
       }
       const refX = noPos ? noPos.x : fromPos.x;
       if (yesPos) {
-        yesPos.x = refX + NODE_W + PAD_X;
+        yesPos.x = refX + NODE_W + PAD_X + noChainDepth[e.from] * (NODE_W + PAD_X);
       }
     }
 
@@ -459,14 +484,15 @@ header button:hover { background: #c73650; }
       let x1, y1, x2, y2, d, labelX, labelY;
 
       if (isDecision && e.label === 'Yes') {
-        // Yes exits from the right side of the diamond and should read
-        // as entering the right-hand branch node, not dropping vaguely above it.
+        // Yes always exits from the right side of the diamond.
+        // For right-hand targets, land on the top of the target block so each
+        // branch reads as belonging to its own node in else-if chains.
         x1 = from.x + from.w + 15; y1 = fromCy;
         if (toCx >= fromCx) {
-          x2 = to.x;
-          y2 = toCy;
-          const rightX = Math.max(x1 + 24, x2 - 24);
-          d = `M ${x1} ${y1} L ${rightX} ${y1} L ${rightX} ${y2} L ${x2} ${y2}`;
+          x2 = toCx;
+          y2 = to.y;
+          const laneX = Math.max(x1 + 36, x2);
+          d = `M ${x1} ${y1} L ${laneX} ${y1} L ${laneX} ${y2}`;
         } else {
           x2 = toCx;
           y2 = to.y;
