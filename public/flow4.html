@@ -125,11 +125,13 @@ return</textarea>
     }
 
     if (edge.viaGoto) {
-      const startX = from.x + from.w;
-      const startY = fromCy;
-      const laneX = graph.totalWidth - 50;
+      const startX = fromCx;
+      const startY = from.y + from.h;
+      const laneY = startY + 22;
+      const laneX = graph.totalWidth - 70;
+      const targetY = toCy;
       return {
-        d: `M ${startX} ${startY} L ${laneX} ${startY} L ${laneX} ${toCy} L ${to.x + to.w} ${toCy}`
+        d: `M ${startX} ${startY} L ${startX} ${laneY} L ${laneX} ${laneY} L ${laneX} ${targetY} L ${to.x + to.w} ${targetY}`
       };
     }
 
@@ -338,7 +340,14 @@ return</textarea>
       pos.y = 40 + pos.row * 120;
     }
 
-    return { ...graph, positions };
+    let maxRight = graph.totalWidth;
+    let maxBottom = graph.totalHeight;
+    for (const pos of Object.values(positions)) {
+      maxRight = Math.max(maxRight, pos.x + pos.w + 130);
+      maxBottom = Math.max(maxBottom, pos.y + pos.h + 80);
+    }
+
+    return { ...graph, positions, totalWidth: maxRight, totalHeight: maxBottom };
   }
 
   function generate(selectedEntry) {
