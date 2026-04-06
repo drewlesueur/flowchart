@@ -287,7 +287,7 @@ return</textarea>
       incomingCount[edge.to] += 1;
     }
 
-    function shiftBranch(startId, rowDelta) {
+    function shiftBranch(startId, rowDelta, xDelta) {
       const queue = [startId];
       const seen = new Set();
 
@@ -300,6 +300,8 @@ return</textarea>
         if (!pos) continue;
         pos.row -= rowDelta;
         pos.y -= rowDelta * 120;
+        pos.x += xDelta;
+        pos.col += xDelta / 230;
 
         for (const edge of outgoing[nodeId] || []) {
           if (edge.label === "No") continue;
@@ -314,8 +316,9 @@ return</textarea>
       const from = positions[edge.from];
       const to = positions[edge.to];
       if (!from || !to) continue;
+      const xDelta = 60;
       const rowDelta = to.row - from.row;
-      if (rowDelta > 0) shiftBranch(edge.to, rowDelta);
+      shiftBranch(edge.to, Math.max(0, rowDelta), xDelta);
     }
 
     return { ...graph, positions };
