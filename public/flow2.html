@@ -346,6 +346,21 @@ header button:hover { background: #c73650; }
       }
     }
 
+    // Align Start and End with the main "No" flow column
+    // Find the main column x: follow the first decision's No path
+    let mainX = positions[nodes[0].id].x;
+    for (const e of edges) {
+      if (e.label === 'No' && nodeMap[e.from] && nodeMap[e.from].type === T.DECISION) {
+        mainX = positions[e.from].x;
+        break;
+      }
+    }
+    // Align Start and End to the main column
+    const startN = nodes[0];
+    const endN = nodes[nodes.length - 1];
+    if (startN.type === T.START) positions[startN.id].x = mainX;
+    if (endN.type === T.END) positions[endN.id].x = mainX;
+
     // Recompute total dimensions after repositioning
     let maxX = 0;
     let maxY = 0;
@@ -406,6 +421,12 @@ header button:hover { background: #c73650; }
     // Build nodeMap for edge rendering
     const nodeMap = {};
     for (const n of nodes) nodeMap[n.id] = n;
+    const incomingCounts = {};
+    for (const n of nodes) incomingCounts[n.id] = 0;
+    for (const e of edges) {
+      if (e.label === 'loop') continue;
+      incomingCounts[e.to]++;
+    }
 
     // Draw edges
     for (const e of edges) {
@@ -438,12 +459,21 @@ header button:hover { background: #c73650; }
       let x1, y1, x2, y2, d, labelX, labelY;
 
       if (isDecision && e.label === 'Yes') {
-        // Yes exits from the right side of the diamond
+        // Yes exits from the right side of the diamond and should read
+        // as entering the right-hand branch node, not dropping vaguely above it.
         x1 = from.x + from.w + 15; y1 = fromCy;
-        x2 = toCx; y2 = to.y;
-        // Always go right first, then route to target
-        const rightX = Math.max(x1 + 20, x2);
-        d = `M ${x1} ${y1} L ${rightX} ${y1} L ${rightX} ${y2 - 10} L ${x2} ${y2 - 10} L ${x2} ${y2}`;
+        if (toCx >= fromCx) {
+          x2 = to.x;
+          y2 = toCy;
+          const rightX = Math.max(x1 + 24, x2 - 24);
+          d = `M ${x1} ${y1} L ${rightX} ${y1} L ${rightX} ${y2} L ${x2} ${y2}`;
+        } else {
+          x2 = toCx;
+          y2 = to.y;
+          const rightX = x1 + 24;
+          const bendY = y2 - 18;
+          d = `M ${x1} ${y1} L ${rightX} ${y1} L ${rightX} ${bendY} L ${x2} ${bendY} L ${x2} ${y2}`;
+        }
         labelX = x1 + 4;
         labelY = y1 - 6;
       } else if (isDecision && e.label === 'No') {
@@ -453,8 +483,8 @@ header button:hover { background: #c73650; }
         if (Math.abs(x1 - x2) < 2) {
           d = `M ${x1} ${y1} L ${x2} ${y2}`;
         } else {
-          const midY = (y1 + y2) / 2;
-          d = `M ${x1} ${y1} L ${x1} ${midY} L ${x2} ${midY} L ${x2} ${y2}`;
+          const bendY = y2 - 18;
+          d = `M ${x1} ${y1} L ${x1} ${bendY} L ${x2} ${bendY} L ${x2} ${y2}`;
         }
         labelX = x1 + 6;
         labelY = (y1 + Math.min(y1 + 30, y2)) / 2;
@@ -470,8 +500,8 @@ header button:hover { background: #c73650; }
         if (Math.abs(x1 - x2) < 2) {
           d = `M ${x1} ${y1} L ${x2} ${y2}`;
         } else {
-          const midY = (y1 + y2) / 2;
-          d = `M ${x1} ${y1} L ${x1} ${midY} L ${x2} ${midY} L ${x2} ${y2}`;
+          const bendY = incomingCounts[e.to] > 1 ? y2 - 24 : (y1 + y2) / 2;
+          d = `M ${x1} ${y1} L ${x1} ${bendY} L ${x2} ${bendY} L ${x2} ${y2}`;
         }
         labelX = (x1 + x2) / 2 + 4;
         labelY = (y1 + y2) / 2 - 4;
