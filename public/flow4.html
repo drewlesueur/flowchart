@@ -68,6 +68,7 @@ return</textarea>
 <script>
 (function() {
   const NS = "http://www.w3.org/2000/svg";
+  const VIA_GOTO_EXIT_SIDE = "right";
   const codeEl = document.getElementById("code");
   const generateBtn = document.getElementById("generateBtn");
   const entrySelect = document.getElementById("entrySelect");
@@ -125,9 +126,24 @@ return</textarea>
     }
 
     if (edge.viaGoto) {
-      const startX = fromCx;
-      const startY = from.y + from.h;
-      const laneY = startY + 22;
+      const canDropStraightDown =
+        Math.abs(fromCx - toCx) < 2 &&
+        to.y > from.y &&
+        graph.nodes.every((node) => {
+          const pos = graph.positions[node.id];
+          if (!pos || node.id === edge.from || node.id === edge.to) return true;
+          if (pos.y <= from.y || pos.y >= to.y) return true;
+          return fromCx < pos.x || fromCx > pos.x + pos.w;
+        });
+
+      if (canDropStraightDown) {
+        return { d: `M ${fromCx} ${from.y + from.h} L ${toCx} ${to.y}` };
+      }
+
+      const startFromRight = VIA_GOTO_EXIT_SIDE === "right";
+      const startX = startFromRight ? from.x + from.w : fromCx;
+      const startY = startFromRight ? fromCy : from.y + from.h;
+      const laneY = startFromRight ? startY : startY + 22;
       const laneX = graph.totalWidth - 70;
       const targetY = toCy;
       return {
