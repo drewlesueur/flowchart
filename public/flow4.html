@@ -321,6 +321,13 @@ return</textarea>
       shiftBranch(edge.to, Math.max(0, rowDelta), xDelta);
     }
 
+    const rowValues = Array.from(new Set(Object.values(positions).map((pos) => pos.row))).sort((a, b) => a - b);
+    const rowMap = new Map(rowValues.map((row, index) => [row, index]));
+    for (const pos of Object.values(positions)) {
+      pos.row = rowMap.get(pos.row);
+      pos.y = 40 + pos.row * 120;
+    }
+
     return { ...graph, positions };
   }
 
