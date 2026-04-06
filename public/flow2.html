@@ -308,7 +308,7 @@ header button:hover { background: #c73650; }
       }
     }
 
-    // Post-layout: align "No" targets directly below their decision diamond
+    // Post-layout: for each decision, put "No" directly below and "Yes" to its right
     const nodeMap = {};
     for (const n of nodes) nodeMap[n.id] = n;
     for (const e of edges) {
@@ -316,14 +316,41 @@ header button:hover { background: #c73650; }
       const fromNode = nodeMap[e.from];
       if (!fromNode || fromNode.type !== T.DECISION) continue;
       const fromPos = positions[e.from];
-      const toPos = positions[e.to];
-      if (fromPos && toPos) {
-        toPos.x = fromPos.x; // align left edges so centers match
+      const noPos = positions[e.to];
+      if (fromPos && noPos) {
+        noPos.x = fromPos.x;
+      }
+    }
+    for (const e of edges) {
+      if (e.label !== 'Yes') continue;
+      const fromNode = nodeMap[e.from];
+      if (!fromNode || fromNode.type !== T.DECISION) continue;
+      const fromPos = positions[e.from];
+      const yesPos = positions[e.to];
+      // Find the "No" target to position "Yes" to its right
+      let noPos = null;
+      for (const e2 of edges) {
+        if (e2.from === e.from && e2.label === 'No') {
+          noPos = positions[e2.to];
+          break;
+        }
+      }
+      const refX = noPos ? noPos.x : fromPos.x;
+      if (yesPos) {
+        yesPos.x = refX + NODE_W + PAD_X;
       }
     }
 
-    const totalHeight = MARGIN * 2 + (sortedLayers.length) * (NODE_H + PAD_Y);
-    const totalWidth = MARGIN * 2 + maxWidth;
+    // Recompute total dimensions after repositioning
+    let maxX = 0;
+    let maxY = 0;
+    for (const id in positions) {
+      const p = positions[id];
+      if (p.x + p.w > maxX) maxX = p.x + p.w;
+      if (p.y + p.h > maxY) maxY = p.y + p.h;
+    }
+    const totalHeight = maxY + MARGIN;
+    const totalWidth = maxX + MARGIN;
 
     return { positions, totalWidth, totalHeight, NODE_W, NODE_H };
   }
