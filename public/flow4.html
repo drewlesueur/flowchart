@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TrickleScript Flowchart</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; height: 100vh; display: flex; flex-direction: column; background: #1a1a2e; color: #e0e0e0; }
+header { padding: 10px 20px; background: #16213e; border-bottom: 1px solid #0f3460; display: flex; align-items: center; gap: 12px; }
+header h1 { font-size: 16px; font-weight: 600; color: #e94560; }
+header button { padding: 5px 14px; background: #e94560; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
+header button:hover { background: #c73650; }
+header label { font-size: 12px; color: #888; display: flex; align-items: center; gap: 6px; margin-left: auto; }
+header select { background: #0a0a1a; color: #e0e0e0; border: 1px solid #0f3460; border-radius: 4px; padding: 4px 8px; font-size: 12px; }
+.container { display: flex; flex: 1; overflow: hidden; }
+.left { width: 42%; display: flex; flex-direction: column; border-right: 1px solid #0f3460; }
+.left label, .right label { padding: 8px 12px; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #888; background: #16213e; border-bottom: 1px solid #0f3460; }
+.left textarea { flex: 1; resize: none; background: #0a0a1a; color: #e0e0e0; border: none; padding: 12px; font-family: 'Courier New', monospace; font-size: 14px; line-height: 1.5; outline: none; tab-size: 2; }
+.right { flex: 1; overflow: auto; background: #12122a; display: flex; flex-direction: column; }
+#svgContainer { flex: 1; min-width: 100%; min-height: 100%; }
+.status { font-size: 12px; color: #888; }
+@media (max-width: 900px) {
+  .container { flex-direction: column; }
+  .left { width: 100%; height: 42%; border-right: none; border-bottom: 1px solid #0f3460; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>TrickleScript → Flowchart</h1>
+  <button id="generateBtn">Generate</button>
+  <label>
+    Entry
+    <select id="entrySelect"></select>
+  </label>
+  <div class="status" id="status">Ready</div>
+</header>
+<div class="container">
+  <div class="left">
+    <label>TrickleScript</label>
+    <textarea id="code" spellcheck="false">greet:
+"Hello Mr. " firstName concat lastName concat say
+return
+
+main:
+x 3 eq
+?endIfBlock1
+    doThreeThing
+    *endIf1
+endIfBlock1:
+x 2 eq
+?endIfBlock2
+    doTwoThing
+    *endIf1
+endIfBlock2:
+    doOtherThing
+endIf1:
+carryOn
+return</textarea>
+  </div>
+  <div class="right">
+    <label>Flowchart</label>
+    <div id="svgContainer"></div>
+  </div>
+</div>
+<script src="/tricklescript.js"></script>
+<script>
+(function() {
+  const NS = "http://www.w3.org/2000/svg";
+  const codeEl = document.getElementById("code");
+  const generateBtn = document.getElementById("generateBtn");
+  const entrySelect = document.getElementById("entrySelect");
+  const statusEl = document.getElementById("status");
+  const svgContainer = document.getElementById("svgContainer");
+
+  function el(tag, attrs, children) {
+    const node = document.createElementNS(NS, tag);
+    if (attrs) {
+      for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, value);
+    }
+    if (typeof children === "string") {
+      node.textContent = children;
+    } else if (children) {
+      for (const child of children) node.appendChild(child);
+    }
+    return node;
+  }
+
+  function pathForEdge(from, to, label) {
+    const fromCx = from.x + from.w / 2;
+    const fromCy = from.y + from.h / 2;
+    const toCx = to.x + to.w / 2;
+    const toCy = to.y + to.h / 2;
+
+    if (label === "Yes") {
+      const startX = from.x + from.w + 15;
+      const startY = fromCy;
+      const laneX = Math.max(startX + 26, toCx);
+      return {
+        d: `M ${startX} ${startY} L ${laneX} ${startY} L ${laneX} ${to.y}`,
+        labelX: startX + 8,
+        labelY: startY - 6
+      };
+    }
+
+    if (label === "No") {
+      const startX = fromCx;
+      const startY = from.y + from.h + 5;
+      if (Math.abs(startX - toCx) < 2) {
+        return {
+          d: `M ${startX} ${startY} L ${toCx} ${to.y}`,
+          labelX: startX + 8,
+          labelY: startY + 16
+        };
+      }
+      const bendY = to.y - 18;
+      return {
+        d: `M ${startX} ${startY} L ${startX} ${bendY} L ${toCx} ${bendY} L ${toCx} ${to.y}`,
+        labelX: startX + 8,
+        labelY: startY + 16
+      };
+    }
+
+    if (to.row <= from.row) {
+      const startX = from.x + from.w;
+      const startY = fromCy;
+      const laneX = Math.max(startX, to.x + to.w) + 34;
+      return { d: `M ${startX} ${startY} L ${laneX} ${startY} L ${laneX} ${toCy} L ${to.x + to.w} ${toCy}` };
+    }
+
+    if (Math.abs(fromCx - toCx) < 2) {
+      return { d: `M ${fromCx} ${from.y + from.h} L ${toCx} ${to.y}` };
+    }
+
+    const bendY = to.y - 22;
+    return { d: `M ${fromCx} ${from.y + from.h} L ${fromCx} ${bendY} L ${toCx} ${bendY} L ${toCx} ${to.y}` };
+  }
+
+  function populateEntries(program, selected) {
+    const desired = selected || entrySelect.value || (program.routineMap.main ? "main" : program.routines[0].name);
+    entrySelect.innerHTML = "";
+
+    for (const routine of program.routines) {
+      const option = document.createElement("option");
+      option.value = routine.name;
+      option.textContent = routine.name;
+      if (routine.name === desired) option.selected = true;
+      entrySelect.appendChild(option);
+    }
+  }
+
+  function render(graph) {
+    svgContainer.innerHTML = "";
+    const svg = el("svg", {
+      width: graph.totalWidth,
+      height: graph.totalHeight,
+      viewBox: `0 0 ${graph.totalWidth} ${graph.totalHeight}`,
+      xmlns: NS
+    });
+
+    const defs = el("defs");
+    const marker = el("marker", {
+      id: "arrow",
+      viewBox: "0 0 10 10",
+      refX: "10",
+      refY: "5",
+      markerWidth: "8",
+      markerHeight: "8",
+      orient: "auto-start-reverse",
+      fill: "#4a6fa5"
+    });
+    marker.appendChild(el("path", { d: "M 0 0 L 10 5 L 0 10 z" }));
+    defs.appendChild(marker);
+    svg.appendChild(defs);
+
+    const nodeMap = {};
+    for (const node of graph.nodes) nodeMap[node.id] = node;
+
+    for (const edge of graph.edges) {
+      const from = graph.positions[edge.from];
+      const to = graph.positions[edge.to];
+      if (!from || !to) continue;
+
+      const result = pathForEdge(from, to, edge.label);
+      svg.appendChild(el("path", {
+        d: result.d,
+        stroke: "#4a6fa5",
+        "stroke-width": "1.5",
+        fill: "none",
+        "marker-end": "url(#arrow)"
+      }));
+
+      if (edge.label) {
+        svg.appendChild(el("text", {
+          x: result.labelX,
+          y: result.labelY,
+          fill: "#e94560",
+          "font-size": "11",
+          "font-family": "-apple-system, sans-serif"
+        }, edge.label));
+      }
+    }
+
+    for (const node of graph.nodes) {
+      const pos = graph.positions[node.id];
+      if (!pos) continue;
+
+      const x = pos.x;
+      const y = pos.y;
+      const w = pos.w;
+      const h = pos.h;
+      const cx = x + w / 2;
+      const cy = y + h / 2;
+
+      if (node.type === "start" || node.type === "end") {
+        svg.appendChild(el("rect", {
+          x, y, width: w, height: h, rx: h / 2, ry: h / 2,
+          fill: node.type === "start" ? "#0f3460" : "#1a1a2e",
+          stroke: "#e94560", "stroke-width": "2"
+        }));
+      } else if (node.type === "decision") {
+        svg.appendChild(el("polygon", {
+          points: `${cx},${y - 5} ${x + w + 15},${cy} ${cx},${y + h + 5} ${x - 15},${cy}`,
+          fill: "#16213e",
+          stroke: "#e9a645",
+          "stroke-width": "2"
+        }));
+      } else if (node.type === "return") {
+        svg.appendChild(el("polygon", {
+          points: `${x + 12},${y} ${x + w},${y} ${x + w - 12},${y + h} ${x},${y + h}`,
+          fill: "#16213e",
+          stroke: "#45e980",
+          "stroke-width": "2"
+        }));
+      } else {
+        svg.appendChild(el("rect", {
+          x, y, width: w, height: h,
+          fill: "#16213e",
+          stroke: "#4a6fa5",
+          "stroke-width": "1.5"
+        }));
+      }
+
+      let label = node.label;
+      const maxChars = 24;
+      if (label.length > maxChars) label = label.slice(0, maxChars - 1) + "\u2026";
+      svg.appendChild(el("text", {
+        x: cx,
+        y: cy,
+        fill: "#e0e0e0",
+        "font-size": "12",
+        "font-family": '"Courier New", monospace',
+        "text-anchor": "middle",
+        "dominant-baseline": "central"
+      }, label));
+    }
+
+    svgContainer.appendChild(svg);
+  }
+
+  function generate(selectedEntry) {
+    const code = codeEl.value;
+
+    try {
+      const program = TrickleScript.parse(code);
+      populateEntries(program, selectedEntry);
+      const entry = entrySelect.value || (program.routineMap.main ? "main" : program.routines[0].name);
+      const graph = TrickleScript.buildFlowGraph(program, { entry });
+      render(graph);
+      statusEl.textContent = `${entry} • ${graph.nodes.length - 2} steps`;
+    } catch (error) {
+      svgContainer.innerHTML = "";
+      statusEl.textContent = "Parse error";
+      console.error(error);
+    }
+  }
+
+  generateBtn.addEventListener("click", function() {
+    generate(entrySelect.value);
+  });
+
+  entrySelect.addEventListener("change", function() {
+    generate(entrySelect.value);
+  });
+
+  let timer;
+  codeEl.addEventListener("input", function() {
+    clearTimeout(timer);
+    timer = setTimeout(function() {
+      generate(entrySelect.value);
+    }, 220);
+  });
+
+  codeEl.addEventListener("keydown", function(event) {
+    if (event.key === "Tab") {
+      event.preventDefault();
+      const start = codeEl.selectionStart;
+      const end = codeEl.selectionEnd;
+      codeEl.value = codeEl.value.slice(0, start) + "  " + codeEl.value.slice(end);
+      codeEl.selectionStart = codeEl.selectionEnd = start + 2;
+    }
+  });
+
+  generate("main");
+})();
+</script>
+</body>
+</html>
