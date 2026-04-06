@@ -97,9 +97,10 @@ return</textarea>
     if (label === "Yes") {
       const startX = from.x + from.w + 15;
       const startY = fromCy;
-      const laneX = Math.max(startX + 26, toCx);
+      const endX = to.x;
+      const endY = toCy;
       return {
-        d: `M ${startX} ${startY} L ${laneX} ${startY} L ${laneX} ${to.y}`,
+        d: `M ${startX} ${startY} L ${endX} ${endY}`,
         labelX: startX + 8,
         labelY: startY - 6
       };
