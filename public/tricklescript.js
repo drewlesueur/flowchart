@@ -408,6 +408,20 @@
       return null;
     }
 
+    function nextExecutable(index) {
+      let current = index;
+      while (current < routine.instructions.length) {
+        const instruction = routine.instructions[current];
+        if (!instruction) return null;
+        if (instruction.type === "label") {
+          current += 1;
+          continue;
+        }
+        return instruction;
+      }
+      return null;
+    }
+
     const firstVisible = follow(0);
     if (firstVisible) edges.push({ from: startNode.id, to: firstVisible, label: "" });
     else edges.push({ from: startNode.id, to: endNode.id, label: "" });
@@ -431,7 +445,13 @@
       }
 
       const nextTarget = follow(node.instructionIndex + 1);
-      edges.push({ from: node.id, to: nextTarget || endNode.id, label: "" });
+      const nextInstruction = nextExecutable(node.instructionIndex + 1);
+      edges.push({
+        from: node.id,
+        to: nextTarget || endNode.id,
+        label: "",
+        viaGoto: nextInstruction && nextInstruction.type === "goto"
+      });
     }
 
     const conditionalRanges = [];

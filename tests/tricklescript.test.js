@@ -124,6 +124,27 @@ return
   assert.notEqual(yesEdge.to, noEdge.to);
 });
 
+test("buildFlowGraph marks edges that flow through goto", () => {
+  const source = `
+main:
+x 3 eq
+?endIfBlock1
+doThreeThing
+*endIf1
+endIfBlock1:
+doOtherThing
+endIf1:
+carryOn
+return
+`;
+
+  const graph = TrickleScript.buildFlowGraph(source, { entry: "main" });
+  const doThree = graph.nodes.find((node) => node.label === "doThreeThing");
+  const jumpEdge = graph.edges.find((edge) => edge.from === doThree.id);
+
+  assert.equal(jumpEdge.viaGoto, true);
+});
+
 test("unknown goto labels are rejected", () => {
   const source = `
 main:

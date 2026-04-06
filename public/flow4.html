@@ -87,7 +87,8 @@ return</textarea>
     return node;
   }
 
-  function pathForEdge(from, to, label) {
+  function pathForEdge(from, to, edge, graph) {
+    const label = edge.label;
     const fromCx = from.x + from.w / 2;
     const fromCy = from.y + from.h / 2;
     const toCx = to.x + to.w / 2;
@@ -119,6 +120,15 @@ return</textarea>
         d: `M ${startX} ${startY} L ${startX} ${bendY} L ${toCx} ${bendY} L ${toCx} ${to.y}`,
         labelX: startX + 8,
         labelY: startY + 16
+      };
+    }
+
+    if (edge.viaGoto) {
+      const startX = from.x + from.w;
+      const startY = fromCy;
+      const laneX = graph.totalWidth - 50;
+      return {
+        d: `M ${startX} ${startY} L ${laneX} ${startY} L ${laneX} ${toCy} L ${to.x + to.w} ${toCy}`
       };
     }
 
@@ -182,7 +192,7 @@ return</textarea>
       const to = graph.positions[edge.to];
       if (!from || !to) continue;
 
-      const result = pathForEdge(from, to, edge.label);
+      const result = pathForEdge(from, to, edge, graph);
       svg.appendChild(el("path", {
         d: result.d,
         stroke: "#4a6fa5",
