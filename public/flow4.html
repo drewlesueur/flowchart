@@ -270,6 +270,24 @@ return</textarea>
     svgContainer.appendChild(svg);
   }
 
+  function alignYesTargets(graph) {
+    const positions = {};
+    for (const [id, pos] of Object.entries(graph.positions)) {
+      positions[id] = { ...pos };
+    }
+
+    for (const edge of graph.edges) {
+      if (edge.label !== "Yes") continue;
+      const from = positions[edge.from];
+      const to = positions[edge.to];
+      if (!from || !to) continue;
+      to.row = from.row;
+      to.y = from.y;
+    }
+
+    return { ...graph, positions };
+  }
+
   function generate(selectedEntry) {
     const code = codeEl.value;
 
@@ -278,7 +296,8 @@ return</textarea>
       populateEntries(program, selectedEntry);
       const entry = entrySelect.value || (program.routineMap.main ? "main" : program.routines[0].name);
       const graph = TrickleScript.buildFlowGraph(program, { entry });
-      render(graph);
+      const displayGraph = alignYesTargets(graph);
+      render(displayGraph);
       statusEl.textContent = `${entry} • ${graph.nodes.length - 2} steps`;
     } catch (error) {
       svgContainer.innerHTML = "";
