@@ -1,0 +1,29 @@
+main:
+x 10 eq
+?outerElse
+leftStart
+y 20 eq
+?leftElse
+leftInnerStart
+z 30 eq
+?leftInnerElse
+leftInnerYes
+*afterInner
+leftInnerElse:
+leftInnerNo
+afterInner:
+*afterOuter
+leftElse:
+leftElseWork
+*afterOuter
+outerElse:
+rightStart
+q 40 eq
+?rightElse
+rightInnerStart
+*afterOuter
+rightElse:
+rightElseWork
+afterOuter:
+finish
+return

@@ -1,0 +1,20 @@
+main:
+orderPaid true eq
+?paymentHold
+orderHighValue true eq
+?standardReview
+approveOrder
+*afterReview
+standardReview:
+reviewOrder
+afterReview:
+itemsBackordered true eq
+?skipBackorderNotice
+notifyCustomer
+skipBackorderNotice:
+shipOrder
+return
+
+paymentHold:
+holdOrder
+return

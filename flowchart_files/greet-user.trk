@@ -1,0 +1,9 @@
+greet:
+>lastName
+>firstName
+"Hello Mr. " firstName concat lastName concat "?" concat say
+return
+
+main:
+"LeSueur" "Drew" greet
+return

@@ -1,0 +1,22 @@
+main:
+cond1 true eq
+?else1
+path1
+cond2 true eq
+?else2
+path2
+cond3 true eq
+?else3
+path3
+*afterAll
+else3:
+path3No
+*afterAll
+else2:
+path2No
+*afterAll
+else1:
+path1No
+afterAll:
+tailWork
+return
