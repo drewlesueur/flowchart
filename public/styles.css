@@ -277,6 +277,7 @@ button:hover {
   min-width: 100%;
   min-height: 100%;
   padding: 16px;
+  position: relative;
 }
 
 #svgMount {
@@ -290,10 +291,82 @@ button:hover {
   overflow: visible;
 }
 
+#phase2Mount {
+  min-height: 100%;
+}
+
+.chart-tabs {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.chart-tab {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  padding: 7px 10px;
+}
+
+.chart-tab:hover {
+  background: rgba(36, 59, 99, 0.55);
+}
+
+.chart-tab.is-active {
+  background: #243b63;
+  color: var(--text);
+}
+
+.chart-tab-panel {
+  display: none;
+  min-height: 100%;
+}
+
+.chart-tab-panel.is-active {
+  display: block;
+  min-height: 100%;
+}
+
+.phase2-viewer {
+  min-height: calc(100vh - 220px);
+  display: grid;
+  grid-template-rows: auto minmax(420px, 1fr);
+  gap: 12px;
+}
+
+.phase2-hint {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.phase2-viewport {
+  position: relative;
+  min-height: 420px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background:
+    radial-gradient(circle at top, rgba(126, 166, 255, 0.1), transparent 30%),
+    linear-gradient(180deg, rgba(15, 18, 36, 0.96), rgba(11, 15, 29, 1));
+  cursor: grab;
+  touch-action: none;
+}
+
+.phase2-viewport:active {
+  cursor: grabbing;
+}
+
+.phase2-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: visible;
+}
+
 .empty-state {
   padding: 16px;
   border: 1px dashed var(--line);
   background: rgba(22, 33, 62, 0.45);
+  position: absolute;
+  inset: 16px;
 }
 
 @media (max-width: 900px) {
@@ -317,5 +390,9 @@ button:hover {
 
   .panel {
     min-height: 320px;
+  }
+
+  .phase2-viewer {
+    min-height: 560px;
   }
 }

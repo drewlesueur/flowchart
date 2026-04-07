@@ -36,12 +36,23 @@
 
         <section class="panel chart-panel">
           <div class="panel-bar">
-            <h2>Flowchart</h2>
-            <p id="statusText">Ready</p>
+            <div>
+              <h2>Flowchart</h2>
+              <p id="statusText">Ready</p>
+            </div>
+            <div class="chart-tabs" role="tablist" aria-label="Flowchart views">
+              <button id="tabClassic" type="button" class="chart-tab is-active" role="tab" aria-selected="true">Classic</button>
+              <button id="tabPhase2" type="button" class="chart-tab" role="tab" aria-selected="false">Phase 2</button>
+            </div>
           </div>
           <div class="chart-scroll">
             <div id="previewHost" class="chart-host" aria-live="polite">
-              <div id="svgMount"></div>
+              <section id="panelClassic" class="chart-tab-panel is-active" role="tabpanel">
+                <div id="svgMount"></div>
+              </section>
+              <section id="panelPhase2" class="chart-tab-panel" role="tabpanel" aria-hidden="true">
+                <div id="phase2Mount"></div>
+              </section>
             </div>
           </div>
         </section>
@@ -50,6 +61,7 @@
 
     <script src="/tricklescript.js"></script>
     <script src="/tricklescript-renderer.js"></script>
+    <script src="/tricklescript-renderer-v2.js"></script>
     <script src="/detail.js"></script>
   </body>
 </html>

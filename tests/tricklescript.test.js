@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 
 const TrickleScript = require("../public/tricklescript.js");
 const TrickleScriptRenderer = require("../public/tricklescript-renderer.js");
+const TrickleScriptRendererV2 = require("../public/tricklescript-renderer-v2.js");
 
 test("runs concat and say", () => {
   const source = `
@@ -289,6 +290,58 @@ return
     .filter((d) => typeof d === "string" && d.includes(" L "));
 
   assert.ok(yesPaths.some((d) => /L \d+ \d+ L \d+ \d+ L \d+ \d+$/.test(d)));
+});
+
+test("phase 2 tree keeps yes and no branches nested under decisions", () => {
+  const source = `
+main:
+first true eq
+?skipMain
+second true eq
+?skipSecond
+work
+return
+skipSecond:
+fallback
+return
+skipMain:
+wait
+return
+`;
+
+  const tree = TrickleScriptRendererV2.buildFlowTree(TrickleScript.buildFlowGraph(source, { entry: "main" }));
+  const firstDecision = tree.root.find((item) => item.kind === "decision");
+
+  assert.ok(firstDecision);
+  assert.equal(firstDecision.yes[0].kind, "node");
+  assert.equal(firstDecision.yes[1].kind, "decision");
+  assert.equal(firstDecision.no[0].kind, "node");
+});
+
+test("phase 2 scene reveals more nested nodes at higher zoom", () => {
+  const source = `
+main:
+first true eq
+?skipMain
+second true eq
+?skipSecond
+work
+return
+skipSecond:
+fallback
+return
+skipMain:
+wait
+return
+`;
+
+  const tree = TrickleScriptRendererV2.buildFlowTree(TrickleScript.buildFlowGraph(source, { entry: "main" }));
+  const lowZoom = TrickleScriptRendererV2.buildScene(tree, { zoom: 0.7 });
+  const highZoom = TrickleScriptRendererV2.buildScene(tree, { zoom: 2.4 });
+
+  assert.ok(lowZoom.labels.length < highZoom.labels.length);
+  assert.equal(TrickleScriptRendererV2.getDetailDepth(0.7), 0);
+  assert.equal(TrickleScriptRendererV2.getDetailDepth(2.4), 4);
 });
 
 test("unknown goto labels are rejected", () => {
