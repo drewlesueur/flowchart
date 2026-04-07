@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SVG Test 1</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: Georgia, "Times New Roman", serif;
+        background: #f8f1e7;
+        color: #2c1a12;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background:
+          radial-gradient(circle at top, rgba(255, 255, 255, 0.92), rgba(248, 241, 231, 0.7) 45%),
+          linear-gradient(180deg, #f7efe4 0%, #ecd8c2 100%);
+      }
+
+      main {
+        width: min(92vw, 720px);
+        padding: 32px;
+        border-radius: 28px;
+        background: rgba(255, 252, 246, 0.8);
+        box-shadow: 0 20px 50px rgba(94, 47, 20, 0.12);
+        text-align: center;
+      }
+
+      h1 {
+        margin: 0 0 10px;
+        font-size: clamp(2rem, 4vw, 3rem);
+      }
+
+      p {
+        margin: 0 0 28px;
+        font-size: 1.05rem;
+      }
+
+      svg {
+        width: min(100%, 360px);
+        height: auto;
+        overflow: visible;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>SVG Apple Test</h1>
+      <p>Standalone HTML page with an embedded SVG apple.</p>
+      <svg viewBox="0 0 320 320" role="img" aria-label="A red apple with a green leaf">
+        <defs>
+          <radialGradient id="appleFill" cx="35%" cy="28%" r="70%">
+            <stop offset="0%" stop-color="#ff8f7f" />
+            <stop offset="45%" stop-color="#e64534" />
+            <stop offset="100%" stop-color="#8f170f" />
+          </radialGradient>
+          <radialGradient id="leafFill" cx="40%" cy="40%" r="70%">
+            <stop offset="0%" stop-color="#9ee576" />
+            <stop offset="100%" stop-color="#3b8b2d" />
+          </radialGradient>
+        </defs>
+
+        <ellipse cx="160" cy="186" rx="88" ry="94" fill="url(#appleFill)" />
+        <ellipse cx="134" cy="176" rx="55" ry="72" fill="rgba(255,255,255,0.12)" />
+        <path
+          d="M159 108
+             C144 92, 116 88, 96 104
+             C74 122, 68 151, 72 186
+             C78 241, 111 279, 160 279
+             C209 279, 242 241, 248 186
+             C252 151, 246 122, 224 104
+             C204 88, 176 92, 161 108
+             Z"
+          fill="url(#appleFill)"
+          stroke="#7b120b"
+          stroke-width="4"
+          stroke-linejoin="round"
+        />
+        <path
+          d="M157 106
+             C151 91, 154 70, 171 50"
+          fill="none"
+          stroke="#5c3413"
+          stroke-width="8"
+          stroke-linecap="round"
+        />
+        <path
+          d="M171 56
+             C200 38, 237 42, 249 69
+             C217 84, 189 80, 171 56
+             Z"
+          fill="url(#leafFill)"
+          stroke="#2f6b26"
+          stroke-width="4"
+          stroke-linejoin="round"
+        />
+        <path
+          d="M184 64 C203 69, 220 77, 233 88"
+          fill="none"
+          stroke="#2f6b26"
+          stroke-width="3"
+          stroke-linecap="round"
+        />
+      </svg>
+    </main>
+  </body>
+</html>
