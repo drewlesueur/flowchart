@@ -81,15 +81,15 @@
       return { d: `M ${startX} ${startY} L ${laneX} ${startY} L ${laneX} ${toCy} L ${to.x + to.w} ${toCy}` };
     }
 
+    if (Math.abs(fromCx - toCx) < 2) {
+      return { d: `M ${fromCx} ${from.y + from.h} L ${toCx} ${to.y}` };
+    }
+
     if (incomingCount > 1) {
       const startX = from.x + from.w;
       const startY = fromCy;
       const laneX = Math.max(startX, to.x + to.w) + 34;
       return { d: `M ${startX} ${startY} L ${laneX} ${startY} L ${laneX} ${toCy} L ${to.x + to.w} ${toCy}` };
-    }
-
-    if (Math.abs(fromCx - toCx) < 2) {
-      return { d: `M ${fromCx} ${from.y + from.h} L ${toCx} ${to.y}` };
     }
 
     const bendY = to.y - 22;
