@@ -5,33 +5,21 @@
     root.TrickleScriptRendererV2 = factory();
   }
 })(typeof globalThis !== "undefined" ? globalThis : this, function() {
-  const NS = "http://www.w3.org/2000/svg";
   const NODE_W = 176;
   const NODE_H = 56;
   const GAP_Y = 34;
   const BRANCH_GAP = 24;
-  const BRANCH_X = 248;
-  const YES_INDENT = 0;
+  const BRANCH_X = 264;
+  const BUBBLE_MIN_W = 208;
+  const BUBBLE_MIN_H = 120;
+  const BUBBLE_PAD = 22;
   const PADDING = 48;
   const CULL_PAD = 220;
+  const FONT_STACK = '"Courier New", monospace';
+  const UI_FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
 
   function clamp(value, min, max) {
     return Math.min(max, Math.max(min, value));
-  }
-
-  function el(tag, attrs, children) {
-    const node = document.createElementNS(NS, tag);
-    if (attrs) {
-      for (const [key, value] of Object.entries(attrs)) {
-        node.setAttribute(key, value);
-      }
-    }
-    if (typeof children === "string") {
-      node.textContent = children;
-    } else if (children) {
-      for (const child of children) node.appendChild(child);
-    }
-    return node;
   }
 
   function truncateLabel(label, maxChars) {
@@ -58,19 +46,17 @@
     }
 
     for (const edge of graph.edges) {
-      if (!edgeMap[edge.from]) edgeMap[edge.from] = [];
       edgeMap[edge.from].push(edge);
-      if (!adjacency[edge.from]) adjacency[edge.from] = [];
       adjacency[edge.from].push(edge.to);
     }
 
     function unlabeledTarget(nodeId) {
-      const edge = (edgeMap[nodeId] || []).find((candidate) => !candidate.label);
+      const edge = edgeMap[nodeId].find((candidate) => !candidate.label);
       return edge ? edge.to : null;
     }
 
     function branchTarget(nodeId, label) {
-      const edge = (edgeMap[nodeId] || []).find((candidate) => candidate.label === label);
+      const edge = edgeMap[nodeId].find((candidate) => candidate.label === label);
       return edge ? edge.to : null;
     }
 
@@ -88,10 +74,8 @@
 
       while (queue.length) {
         const current = queue.shift();
-        if (!current || current.id == null) continue;
-        if (distances.has(current.id)) continue;
+        if (!current || current.id == null || distances.has(current.id)) continue;
         distances.set(current.id, current.distance);
-
         for (const nextId of adjacency[current.id] || []) {
           queue.push({ id: nextId, distance: current.distance + 1 });
         }
@@ -118,12 +102,7 @@
       }
 
       if (!candidates.length) return "end";
-
-      candidates.sort((a, b) => {
-        if (a.score !== b.score) return a.score - b.score;
-        return a.rank - b.rank;
-      });
-
+      candidates.sort((a, b) => (a.score - b.score) || (a.rank - b.rank));
       return candidates[0].nodeId;
     }
 
@@ -196,10 +175,10 @@
     const scene = {
       width: 0,
       height: 0,
-      shapes: [],
-      labels: [],
       paths: [],
+      labels: [],
       badges: [],
+      bubbles: [],
       nodes: []
     };
 
@@ -212,26 +191,45 @@
       );
     }
 
-    function addNodeShape(nodeId, x, y, mode) {
+    function addNode(nodeId, x, y, mode) {
       const node = tree.nodeMap[nodeId];
-      if (!node) return;
-      const box = { x, y, w: NODE_W, h: NODE_H };
-      if (!inView(box.x, box.y, box.w, box.h)) return;
-
-      scene.nodes.push({ id: nodeId, type: node.type, label: node.label, mode, depth: mode === "detail" ? 1 : 0, ...box });
-      scene.shapes.push({ id: nodeId, type: node.type, mode, ...box });
-      scene.labels.push({
+      if (!node || !inView(x, y, NODE_W, NODE_H)) return;
+      scene.nodes.push({
         id: nodeId,
+        type: node.type,
+        label: truncateLabel(node.label, mode === "detail" ? 28 : 22),
+        x,
+        y,
+        w: NODE_W,
+        h: NODE_H,
+        mode
+      });
+      scene.labels.push({
         text: truncateLabel(node.label, mode === "detail" ? 28 : 22),
         x: x + NODE_W / 2,
-        y: y + NODE_H / 2
+        y: y + NODE_H / 2,
+        kind: "node"
       });
     }
 
     function addReference(item, x, y) {
       if (!inView(x, y, NODE_W, NODE_H - 12)) return;
-      scene.shapes.push({ type: "reference", x, y, w: NODE_W, h: NODE_H - 12 });
-      scene.labels.push({ text: "Loop to " + item.label, x: x + NODE_W / 2, y: y + (NODE_H - 12) / 2 });
+      scene.nodes.push({
+        id: item.nodeId,
+        type: "reference",
+        label: "Loop to " + item.label,
+        x,
+        y,
+        w: NODE_W,
+        h: NODE_H - 12,
+        mode: "summary"
+      });
+      scene.labels.push({
+        text: "Loop to " + item.label,
+        x: x + NODE_W / 2,
+        y: y + (NODE_H - 12) / 2,
+        kind: "reference"
+      });
     }
 
     function addPath(points, mode) {
@@ -239,21 +237,24 @@
       let minY = Infinity;
       let maxX = -Infinity;
       let maxY = -Infinity;
-
       for (const point of points) {
         minX = Math.min(minX, point.x);
         minY = Math.min(minY, point.y);
         maxX = Math.max(maxX, point.x);
         maxY = Math.max(maxY, point.y);
       }
-
       if (!inView(minX, minY, maxX - minX, maxY - minY)) return;
       scene.paths.push({ points, mode });
     }
 
     function addBadge(text, x, y) {
-      if (!inView(x, y, 64, 24)) return;
+      if (!inView(x, y, 40, 18)) return;
       scene.badges.push({ text, x, y });
+    }
+
+    function addBubble(x, y, width, height, label, direction, expanded, summary) {
+      if (!inView(x, y, width, height)) return;
+      scene.bubbles.push({ x, y, w: width, h: height, label, direction, expanded, summary });
     }
 
     function layoutSequence(items, x, y, depth) {
@@ -297,7 +298,7 @@
       }
 
       if (item.kind === "node") {
-        addNodeShape(item.nodeId, x, y, depth > 0 ? "detail" : "summary");
+        addNode(item.nodeId, x, y, depth > 0 ? "detail" : "summary");
         return {
           height: NODE_H,
           entry: { x: x + NODE_W / 2, y },
@@ -306,93 +307,78 @@
         };
       }
 
-      addNodeShape(item.nodeId, x, y, depth > 0 ? "detail" : "summary");
+      addNode(item.nodeId, x, y, depth > 0 ? "detail" : "summary");
+      const expandBranches = depth < depthLimit;
+      const yesInner = expandBranches && item.yes.length
+        ? layoutSequence(item.yes, x + BRANCH_X + BUBBLE_PAD, y + BUBBLE_PAD, depth + 1)
+        : null;
+      const noInner = expandBranches && item.no.length
+        ? layoutSequence(item.no, x + BUBBLE_PAD, y + NODE_H + BRANCH_GAP + BUBBLE_PAD, depth + 1)
+        : null;
 
-      if (depth >= depthLimit) {
-        addBadge("Yes", x + 18, y + NODE_H + 10);
-        addBadge("No", x + NODE_W + 28, y + NODE_H / 2 - 10);
-        addPath([
-          { x: x + NODE_W / 2, y: y + NODE_H },
-          { x: x + NODE_W / 2, y: y + NODE_H + 22 }
-        ], "branch");
-        addPath([
-          { x: x + NODE_W, y: y + NODE_H / 2 },
-          { x: x + NODE_W + 36, y: y + NODE_H / 2 }
-        ], "branch");
+      const yesBubble = {
+        x: x + BRANCH_X,
+        y,
+        w: Math.max(BUBBLE_MIN_W, yesInner ? yesInner.width + BUBBLE_PAD * 2 : BUBBLE_MIN_W),
+        h: Math.max(BUBBLE_MIN_H, yesInner ? yesInner.height + BUBBLE_PAD * 2 : BUBBLE_MIN_H)
+      };
+      const noBubble = {
+        x,
+        y: y + NODE_H + BRANCH_GAP,
+        w: Math.max(BUBBLE_MIN_W, noInner ? noInner.width + BUBBLE_PAD * 2 : BUBBLE_MIN_W),
+        h: Math.max(BUBBLE_MIN_H, noInner ? noInner.height + BUBBLE_PAD * 2 : BUBBLE_MIN_H)
+      };
 
-        return {
-          height: NODE_H + 32,
-          entry: { x: x + NODE_W / 2, y },
-          exit: { x: x + NODE_W / 2, y: y + NODE_H + 32 },
-          right: x + NODE_W + 56
-        };
-      }
+      addBubble(
+        yesBubble.x,
+        yesBubble.y,
+        yesBubble.w,
+        yesBubble.h,
+        "Yes",
+        "right",
+        expandBranches,
+        item.yes[0] ? truncateLabel(tree.nodeMap[item.yes[0].nodeId || item.yes[0].label]?.label || item.yes[0].label || "Branch", 20) : "Empty"
+      );
+      addBubble(
+        noBubble.x,
+        noBubble.y,
+        noBubble.w,
+        noBubble.h,
+        "No",
+        "down",
+        expandBranches,
+        item.no[0] ? truncateLabel(tree.nodeMap[item.no[0].nodeId || item.no[0].label]?.label || item.no[0].label || "Branch", 20) : "Empty"
+      );
 
-      const yesLayout = item.yes.length
-        ? layoutSequence(item.yes, x + YES_INDENT, y + NODE_H + BRANCH_GAP, depth + 1)
-        : { width: NODE_W, height: 0, entry: null, exit: null, right: x + NODE_W };
-      const noLayout = item.no.length
-        ? layoutSequence(item.no, x + BRANCH_X, y + NODE_H + BRANCH_GAP, depth + 1)
-        : { width: NODE_W, height: 0, entry: null, exit: null, right: x + BRANCH_X + NODE_W };
+      addPath([
+        { x: x + NODE_W, y: y + NODE_H / 2 },
+        { x: yesBubble.x, y: yesBubble.y + yesBubble.h / 2 }
+      ], "branch");
+      addPath([
+        { x: x + NODE_W / 2, y: y + NODE_H },
+        { x: x + NODE_W / 2, y: noBubble.y },
+        { x: noBubble.x + noBubble.w / 2, y: noBubble.y }
+      ], "branch");
 
-      const branchBottom = y + NODE_H + BRANCH_GAP + Math.max(yesLayout.height, noLayout.height, 44);
+      const mergeY = noBubble.y + noBubble.h + 28;
       const mergeX = x + NODE_W / 2;
-      const mergeY = branchBottom + 20;
 
-      addBadge("Yes", x + 18, y + NODE_H + 6);
-      addBadge("No", x + NODE_W + 22, y + 10);
-
-      if (yesLayout.entry) {
-        addPath([
-          { x: x + NODE_W / 2, y: y + NODE_H },
-          { x: x + NODE_W / 2, y: y + NODE_H + 12 },
-          { x: yesLayout.entry.x, y: y + NODE_H + 12 },
-          yesLayout.entry
-        ], "branch");
-      } else {
-        addPath([
-          { x: x + NODE_W / 2, y: y + NODE_H },
-          { x: mergeX, y: mergeY }
-        ], "branch");
-      }
-
-      if (noLayout.entry) {
-        addPath([
-          { x: x + NODE_W, y: y + NODE_H / 2 },
-          { x: noLayout.entry.x - 18, y: y + NODE_H / 2 },
-          { x: noLayout.entry.x - 18, y: noLayout.entry.y },
-          noLayout.entry
-        ], "branch");
-      } else {
-        addPath([
-          { x: x + NODE_W, y: y + NODE_H / 2 },
-          { x: x + NODE_W + 30, y: y + NODE_H / 2 },
-          { x: x + NODE_W + 30, y: mergeY },
-          { x: mergeX, y: mergeY }
-        ], "branch");
-      }
-
-      if (yesLayout.exit) {
-        addPath([
-          yesLayout.exit,
-          { x: yesLayout.exit.x, y: mergeY },
-          { x: mergeX, y: mergeY }
-        ], "merge");
-      }
-
-      if (noLayout.exit) {
-        addPath([
-          noLayout.exit,
-          { x: noLayout.exit.x, y: mergeY },
-          { x: mergeX, y: mergeY }
-        ], "merge");
-      }
+      addPath([
+        { x: yesBubble.x + yesBubble.w / 2, y: yesBubble.y + yesBubble.h },
+        { x: yesBubble.x + yesBubble.w / 2, y: mergeY },
+        { x: mergeX, y: mergeY }
+      ], "merge");
+      addPath([
+        { x: noBubble.x + noBubble.w / 2, y: noBubble.y + noBubble.h },
+        { x: noBubble.x + noBubble.w / 2, y: mergeY },
+        { x: mergeX, y: mergeY }
+      ], "merge");
 
       return {
         height: mergeY - y,
         entry: { x: x + NODE_W / 2, y },
         exit: { x: mergeX, y: mergeY },
-        right: Math.max(x + NODE_W, yesLayout.right, noLayout.right)
+        right: Math.max(x + NODE_W, yesBubble.x + yesBubble.w, noBubble.x + noBubble.w)
       };
     }
 
@@ -402,124 +388,142 @@
     return scene;
   }
 
-  function renderScene(svg, scene) {
-    svg.innerHTML = "";
-    svg.setAttribute("viewBox", `0 0 ${scene.width} ${scene.height}`);
+  function drawRoundedRect(ctx, x, y, width, height, radius) {
+    const r = Math.min(radius, width / 2, height / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + width, y, x + width, y + height, r);
+    ctx.arcTo(x + width, y + height, x, y + height, r);
+    ctx.arcTo(x, y + height, x, y, r);
+    ctx.arcTo(x, y, x + width, y, r);
+    ctx.closePath();
+  }
 
-    const defs = el("defs");
-    const marker = el("marker", {
-      id: "phase2-arrow",
-      viewBox: "0 0 10 10",
-      refX: "10",
-      refY: "5",
-      markerWidth: "8",
-      markerHeight: "8",
-      orient: "auto-start-reverse",
-      fill: "#7ea6ff"
-    });
-    marker.appendChild(el("path", { d: "M 0 0 L 10 5 L 0 10 z" }));
-    defs.appendChild(marker);
-    svg.appendChild(defs);
+  function drawArrowHead(ctx, from, to, color) {
+    const angle = Math.atan2(to.y - from.y, to.x - from.x);
+    const size = 8;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(to.x, to.y);
+    ctx.lineTo(to.x - Math.cos(angle - Math.PI / 6) * size, to.y - Math.sin(angle - Math.PI / 6) * size);
+    ctx.lineTo(to.x - Math.cos(angle + Math.PI / 6) * size, to.y - Math.sin(angle + Math.PI / 6) * size);
+    ctx.closePath();
+    ctx.fill();
+  }
 
-    svg.appendChild(el("rect", {
-      x: 0,
-      y: 0,
-      width: scene.width,
-      height: scene.height,
-      fill: "#0f1224"
-    }));
+  function drawScene(ctx, scene, camera, viewportWidth, viewportHeight) {
+    const dpr = camera.dpr || 1;
+    ctx.save();
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, viewportWidth, viewportHeight);
+
+    const gradient = ctx.createLinearGradient(0, 0, 0, viewportHeight);
+    gradient.addColorStop(0, "#131935");
+    gradient.addColorStop(1, "#090d1a");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, viewportWidth, viewportHeight);
+
+    ctx.save();
+    ctx.translate(camera.panX, camera.panY);
+    ctx.scale(camera.zoom, camera.zoom);
+
+    ctx.fillStyle = "rgba(126, 166, 255, 0.06)";
+    ctx.beginPath();
+    ctx.arc(scene.width * 0.45, 48, 260, 0, Math.PI * 2);
+    ctx.fill();
 
     for (const path of scene.paths) {
-      const d = path.points.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`).join(" ");
-      svg.appendChild(el("path", {
-        d,
-        fill: "none",
-        stroke: path.mode === "merge" ? "#50628f" : "#7ea6ff",
-        "stroke-width": path.mode === "main" ? "1.8" : "1.5",
-        "stroke-linecap": "round",
-        "stroke-linejoin": "round",
-        "marker-end": "url(#phase2-arrow)"
-      }));
+      const color = path.mode === "merge" ? "#4c5d85" : "#7ea6ff";
+      ctx.strokeStyle = color;
+      ctx.lineWidth = path.mode === "main" ? 1.8 : 1.5;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.beginPath();
+      path.points.forEach((point, index) => {
+        if (index === 0) ctx.moveTo(point.x, point.y);
+        else ctx.lineTo(point.x, point.y);
+      });
+      ctx.stroke();
+      if (path.points.length > 1) {
+        drawArrowHead(ctx, path.points[path.points.length - 2], path.points[path.points.length - 1], color);
+      }
     }
 
-    for (const shape of scene.shapes) {
-      if (shape.type === "reference") {
-        svg.appendChild(el("rect", {
-          x: shape.x,
-          y: shape.y,
-          width: shape.w,
-          height: shape.h,
-          rx: 18,
-          ry: 18,
-          fill: "#11182d",
-          stroke: "#53617f",
-          "stroke-dasharray": "6 5",
-          "stroke-width": "1.4"
-        }));
+    for (const bubble of scene.bubbles) {
+      drawRoundedRect(ctx, bubble.x, bubble.y, bubble.w, bubble.h, 24);
+      ctx.fillStyle = bubble.expanded ? "rgba(23, 34, 60, 0.82)" : "rgba(16, 24, 45, 0.92)";
+      ctx.strokeStyle = bubble.label === "Yes" ? "#6fd6a0" : "#ff9f9f";
+      ctx.lineWidth = bubble.expanded ? 2 : 1.6;
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.font = `11px ${UI_FONT}`;
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      ctx.fillStyle = bubble.label === "Yes" ? "#8df0b3" : "#ffb1b1";
+      ctx.fillText(bubble.label, bubble.x + 14, bubble.y + 10);
+
+      ctx.font = `12px ${FONT_STACK}`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = bubble.expanded ? "#9ab0dd" : "#d8e2ff";
+      ctx.fillText(
+        bubble.expanded ? "Zoomed in" : bubble.summary,
+        bubble.x + bubble.w / 2,
+        bubble.expanded ? bubble.y + 18 : bubble.y + bubble.h / 2
+      );
+    }
+
+    for (const node of scene.nodes) {
+      if (node.type === "decision") {
+        const cx = node.x + node.w / 2;
+        const cy = node.y + node.h / 2;
+        ctx.beginPath();
+        ctx.moveTo(cx, node.y);
+        ctx.lineTo(node.x + node.w, cy);
+        ctx.lineTo(cx, node.y + node.h);
+        ctx.lineTo(node.x, cy);
+        ctx.closePath();
+        ctx.fillStyle = "#1b2440";
+        ctx.strokeStyle = "#ffb44d";
+        ctx.lineWidth = 2;
+        ctx.fill();
+        ctx.stroke();
         continue;
       }
 
-      if (shape.type === "decision") {
-        const cx = shape.x + shape.w / 2;
-        const cy = shape.y + shape.h / 2;
-        svg.appendChild(el("polygon", {
-          points: `${cx},${shape.y} ${shape.x + shape.w},${cy} ${cx},${shape.y + shape.h} ${shape.x},${cy}`,
-          fill: "#1b2440",
-          stroke: "#ffb44d",
-          "stroke-width": "2"
-        }));
+      if (node.type === "reference") {
+        drawRoundedRect(ctx, node.x, node.y, node.w, node.h, 18);
+        ctx.fillStyle = "#11182d";
+        ctx.strokeStyle = "#53617f";
+        ctx.lineWidth = 1.4;
+        ctx.setLineDash([6, 5]);
+        ctx.fill();
+        ctx.stroke();
+        ctx.setLineDash([]);
         continue;
       }
 
-      const fill = shape.type === "start" ? "#15345d" : shape.type === "end" ? "#17162b" : "#1b2440";
-      const radius = shape.type === "start" || shape.type === "end" ? 26 : 14;
-      svg.appendChild(el("rect", {
-        x: shape.x,
-        y: shape.y,
-        width: shape.w,
-        height: shape.h,
-        rx: radius,
-        ry: radius,
-        fill,
-        stroke: "#6b8fd6",
-        "stroke-width": shape.mode === "detail" ? "1.9" : "1.4"
-      }));
+      const fill = node.type === "start" ? "#15345d" : node.type === "end" ? "#17162b" : "#1b2440";
+      const radius = (node.type === "start" || node.type === "end") ? 26 : 14;
+      drawRoundedRect(ctx, node.x, node.y, node.w, node.h, radius);
+      ctx.fillStyle = fill;
+      ctx.strokeStyle = "#6b8fd6";
+      ctx.lineWidth = node.mode === "detail" ? 1.9 : 1.4;
+      ctx.fill();
+      ctx.stroke();
     }
 
-    for (const badge of scene.badges) {
-      svg.appendChild(el("rect", {
-        x: badge.x,
-        y: badge.y,
-        width: 38,
-        height: 18,
-        rx: 9,
-        ry: 9,
-        fill: "#0f1830",
-        stroke: "#394563",
-        "stroke-width": "1"
-      }));
-      svg.appendChild(el("text", {
-        x: badge.x + 19,
-        y: badge.y + 9,
-        fill: badge.text === "Yes" ? "#7ddc9b" : "#ff9b9b",
-        "font-size": "10",
-        "font-family": "-apple-system, sans-serif",
-        "text-anchor": "middle",
-        "dominant-baseline": "central"
-      }, badge.text));
-    }
-
+    ctx.font = `12px ${FONT_STACK}`;
+    ctx.fillStyle = "#e8edf9";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
     for (const label of scene.labels) {
-      svg.appendChild(el("text", {
-        x: label.x,
-        y: label.y,
-        fill: "#e8edf9",
-        "font-size": "12",
-        "font-family": '"Courier New", monospace',
-        "text-anchor": "middle",
-        "dominant-baseline": "central"
-      }, label.text));
+      ctx.fillText(label.text, label.x, label.y);
     }
+
+    ctx.restore();
+    ctx.restore();
   }
 
   function mount(graph, mountEl) {
@@ -531,26 +535,32 @@
 
     const hint = document.createElement("div");
     hint.className = "phase2-hint";
-    hint.textContent = "Scroll to zoom. Drag to pan. Branch detail expands as you zoom in.";
+    hint.textContent = "Canvas explorer. Scroll to zoom. Drag to pan. Nested branches open as you zoom in.";
 
     const viewportEl = document.createElement("div");
     viewportEl.className = "phase2-viewport";
-    const svg = el("svg", { xmlns: NS, class: "phase2-svg" });
-    viewportEl.appendChild(svg);
+
+    const canvas = document.createElement("canvas");
+    canvas.className = "phase2-canvas";
+    viewportEl.appendChild(canvas);
     container.appendChild(hint);
     container.appendChild(viewportEl);
     mountEl.appendChild(container);
 
+    const ctx = canvas.getContext("2d");
     const state = {
       zoom: 1,
       panX: 0,
-      panY: 0
+      panY: 24,
+      dpr: 1
     };
-    const sceneBounds = buildScene(tree, { zoom: 3 });
 
-    function viewportToWorld() {
-      const width = viewportEl.clientWidth || 800;
-      const height = viewportEl.clientHeight || 640;
+    const maxScene = buildScene(tree, { zoom: 3 });
+    let rafId = 0;
+    let drag = null;
+    let resizeObserver = null;
+
+    function viewportToWorld(width, height) {
       return {
         left: (-state.panX) / state.zoom,
         top: (-state.panY) / state.zoom,
@@ -559,29 +569,39 @@
       };
     }
 
-    function syncTransform() {
-      svg.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.zoom})`;
-      svg.style.transformOrigin = "0 0";
-      svg.style.width = `${sceneBounds.width}px`;
-      svg.style.height = `${sceneBounds.height}px`;
+    function ensureCanvasSize() {
+      const width = viewportEl.clientWidth || 800;
+      const height = viewportEl.clientHeight || 640;
+      state.dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.floor(width * state.dpr);
+      canvas.height = Math.floor(height * state.dpr);
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
+      return { width, height };
     }
 
-    function render() {
-      syncTransform();
+    function scheduleDraw() {
+      if (rafId) return;
+      rafId = window.requestAnimationFrame(() => {
+        rafId = 0;
+        draw();
+      });
+    }
+
+    function draw() {
+      const { width, height } = ensureCanvasSize();
       const scene = buildScene(tree, {
         zoom: state.zoom,
-        viewport: viewportToWorld()
+        viewport: viewportToWorld(width, height)
       });
-      renderScene(svg, scene);
+      drawScene(ctx, scene, state, width, height);
     }
 
     function centerInitial() {
       const width = viewportEl.clientWidth || 800;
-      state.panX = Math.max(0, (width - sceneBounds.width * state.zoom) / 2);
+      state.panX = Math.max(0, (width - maxScene.width * state.zoom) / 2);
       state.panY = 24;
     }
-
-    let drag = null;
 
     function onWheel(event) {
       event.preventDefault();
@@ -594,7 +614,7 @@
       state.panX = localX - worldX * nextZoom;
       state.panY = localY - worldY * nextZoom;
       state.zoom = nextZoom;
-      render();
+      scheduleDraw();
     }
 
     function onPointerDown(event) {
@@ -606,7 +626,7 @@
       if (!drag) return;
       state.panX = drag.panX + (event.clientX - drag.x);
       state.panY = drag.panY + (event.clientY - drag.y);
-      render();
+      scheduleDraw();
     }
 
     function onPointerUp(event) {
@@ -618,8 +638,7 @@
     }
 
     function onResize() {
-      if (state.panX === 0 && state.panY === 0) centerInitial();
-      render();
+      scheduleDraw();
     }
 
     viewportEl.addEventListener("wheel", onWheel, { passive: false });
@@ -629,22 +648,27 @@
     viewportEl.addEventListener("pointercancel", onPointerUp);
     window.addEventListener("resize", onResize);
 
+    if (typeof window.ResizeObserver === "function") {
+      resizeObserver = new window.ResizeObserver(() => scheduleDraw());
+      resizeObserver.observe(viewportEl);
+    }
+
     centerInitial();
-    render();
+    scheduleDraw();
 
     return {
       refresh() {
-        if (viewportEl.clientWidth > 0) {
-          render();
-        }
+        scheduleDraw();
       },
       destroy() {
+        if (rafId) window.cancelAnimationFrame(rafId);
         viewportEl.removeEventListener("wheel", onWheel);
         viewportEl.removeEventListener("pointerdown", onPointerDown);
         viewportEl.removeEventListener("pointermove", onPointerMove);
         viewportEl.removeEventListener("pointerup", onPointerUp);
         viewportEl.removeEventListener("pointercancel", onPointerUp);
         window.removeEventListener("resize", onResize);
+        if (resizeObserver) resizeObserver.disconnect();
         mountEl.innerHTML = "";
       }
     };

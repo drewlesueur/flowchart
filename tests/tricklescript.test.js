@@ -340,6 +340,10 @@ return
   const highZoom = TrickleScriptRendererV2.buildScene(tree, { zoom: 2.4 });
 
   assert.ok(lowZoom.labels.length < highZoom.labels.length);
+  assert.equal(lowZoom.bubbles.find((bubble) => bubble.label === "Yes").direction, "right");
+  assert.equal(lowZoom.bubbles.find((bubble) => bubble.label === "No").direction, "down");
+  assert.equal(lowZoom.bubbles.find((bubble) => bubble.label === "Yes").expanded, false);
+  assert.ok(highZoom.bubbles.some((bubble) => bubble.label === "Yes" && bubble.expanded));
   assert.equal(TrickleScriptRendererV2.getDetailDepth(0.7), 0);
   assert.equal(TrickleScriptRendererV2.getDetailDepth(2.4), 4);
 });
