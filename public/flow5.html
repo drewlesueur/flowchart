@@ -145,7 +145,7 @@ Node2
   const ctx = canvas.getContext("2d");
 
   const NODE_W = 220;
-  const NODE_MIN_H = 66;
+  const NODE_H = 74;
   const HEADER_H = 34;
   const INNER_PAD = 14;
   const CHILD_GAP = 12;
@@ -160,7 +160,7 @@ Node2
   };
 
   let tree = [];
-  let layout = [];
+  let rootLayout = [];
   let world = { width: 900, height: 700 };
   let drag = null;
   let rafId = 0;
@@ -203,65 +203,25 @@ Node2
     return root;
   }
 
-  function measureNode(node, visibleDepth) {
-    if (visibleDepth <= 0 || !node.children.length) {
-      return { width: NODE_W, height: NODE_MIN_H };
-    }
-
-    let maxChildW = 0;
-    let totalChildH = 0;
-    for (let i = 0; i < node.children.length; i += 1) {
-      const childBox = measureNode(node.children[i], visibleDepth - 1);
-      maxChildW = Math.max(maxChildW, childBox.width);
-      totalChildH += childBox.height;
-      if (i < node.children.length - 1) totalChildH += CHILD_GAP;
-    }
-
-    return {
-      width: Math.max(NODE_W, maxChildW + INNER_PAD * 2),
-      height: HEADER_H + INNER_PAD + totalChildH + INNER_PAD
-    };
-  }
-
-  function layoutNode(node, x, y, visibleDepth, output) {
-    const box = measureNode(node, visibleDepth);
-    output.push({
-      type: "bubble",
-      node,
-      x,
-      y,
-      width: box.width,
-      height: box.height,
-      visibleDepth
-    });
-
-    if (visibleDepth <= 0 || !node.children.length) return box;
-
-    let childY = y + HEADER_H + INNER_PAD;
-    for (const child of node.children) {
-      const childBox = measureNode(child, visibleDepth - 1);
-      const childX = x + (box.width - childBox.width) / 2;
-      layoutNode(child, childX, childY, visibleDepth - 1, output);
-      childY += childBox.height + CHILD_GAP;
-    }
-
-    return box;
-  }
-
   function relayout() {
     tree = parseSource(sourceEl.value);
     const depth = detailDepth(camera.zoom);
-    layout = [];
+    rootLayout = [];
     let y = MARGIN;
-    let maxWidth = 0;
 
     for (const node of tree) {
-      const box = layoutNode(node, MARGIN, y, depth, layout);
-      y += box.height + ROOT_GAP;
-      maxWidth = Math.max(maxWidth, box.width);
+      rootLayout.push({
+        node,
+        x: MARGIN,
+        y,
+        width: NODE_W,
+        height: NODE_H,
+        visibleDepth: depth
+      });
+      y += NODE_H + ROOT_GAP;
     }
 
-    world.width = Math.max(900, maxWidth + MARGIN * 2);
+    world.width = Math.max(900, NODE_W + MARGIN * 2);
     world.height = Math.max(700, y + MARGIN);
     statusEl.textContent = `${tree.length} roots • depth ${depth} • zoom ${camera.zoom.toFixed(2)}x`;
   }
@@ -293,6 +253,62 @@ Node2
     ctx.arcTo(x, y + height, x, y, r);
     ctx.arcTo(x, y, x + width, y, r);
     ctx.closePath();
+  }
+
+  function childIntrinsicHeight(node, remainingDepth) {
+    if (remainingDepth <= 0 || !node.children.length) return 0;
+    return node.children.length * NODE_H + Math.max(0, node.children.length - 1) * CHILD_GAP;
+  }
+
+  function drawNode(node, x, y, remainingDepth, scale) {
+    const width = NODE_W * scale;
+    const height = NODE_H * scale;
+    const headerH = HEADER_H * scale;
+    const radius = 18 * scale;
+
+    roundedRect(x, y, width, height, radius);
+    ctx.fillStyle = remainingDepth > 0 ? "rgba(25, 37, 68, 0.92)" : "rgba(16, 24, 45, 0.96)";
+    ctx.strokeStyle = remainingDepth > 0 ? "#7fb4ff" : "#5f7fb8";
+    ctx.lineWidth = Math.max(0.8, 1.4 * scale);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = "rgba(255,255,255,0.05)";
+    roundedRect(x, y, width, headerH, radius);
+    ctx.fill();
+
+    ctx.font = `${Math.max(6, 12 * scale)}px "Courier New", monospace`;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "#eef4ff";
+    ctx.fillText(truncate(node.label, Math.max(8, Math.floor(26 * scale))), x + 12 * scale, y + headerH / 2);
+
+    if (remainingDepth <= 0 || !node.children.length) {
+      if (node.children.length) {
+        ctx.font = `${Math.max(5, 10 * scale)}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+        ctx.textAlign = "center";
+        ctx.fillStyle = "#98abd5";
+        ctx.fillText(`${node.children.length} nested`, x + width / 2, y + height / 2 + 10 * scale);
+      }
+      return;
+    }
+
+    const innerX = x + INNER_PAD * scale;
+    const innerY = y + headerH + INNER_PAD * scale;
+    const innerW = width - INNER_PAD * 2 * scale;
+    const innerH = height - headerH - INNER_PAD * 2 * scale;
+    const intrinsicH = childIntrinsicHeight(node, remainingDepth);
+    const gapScale = intrinsicH > 0 ? innerH / intrinsicH : 1;
+    const childScale = Math.min(scale * gapScale, innerW / NODE_W, scale);
+    const childGap = CHILD_GAP * childScale;
+    const totalH = node.children.length * NODE_H * childScale + Math.max(0, node.children.length - 1) * childGap;
+    let childY = innerY + Math.max(0, (innerH - totalH) / 2);
+
+    for (const child of node.children) {
+      const childX = innerX + (innerW - NODE_W * childScale) / 2;
+      drawNode(child, childX, childY, remainingDepth - 1, childScale);
+      childY += NODE_H * childScale + childGap;
+    }
   }
 
   function ensureCanvasSize() {
@@ -328,36 +344,9 @@ Node2
     ctx.arc(world.width * 0.4, 30, 240, 0, Math.PI * 2);
     ctx.fill();
 
-    for (const item of layout) {
+    for (const item of rootLayout) {
       if (!inView(item, view)) continue;
-
-      roundedRect(item.x, item.y, item.width, item.height, 18);
-      ctx.fillStyle = item.visibleDepth > 0 ? "rgba(25, 37, 68, 0.92)" : "rgba(16, 24, 45, 0.96)";
-      ctx.strokeStyle = item.visibleDepth > 0 ? "#7fb4ff" : "#5f7fb8";
-      ctx.lineWidth = 1.4;
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.fillStyle = "rgba(255,255,255,0.05)";
-      roundedRect(item.x, item.y, item.width, HEADER_H, 18);
-      ctx.fill();
-
-      ctx.font = '12px "Courier New", monospace';
-      ctx.textAlign = "left";
-      ctx.textBaseline = "middle";
-      ctx.fillStyle = "#eef4ff";
-      ctx.fillText(item.node.label, item.x + 12, item.y + HEADER_H / 2);
-
-      if (item.visibleDepth <= 0 && item.node.children.length) {
-        ctx.font = '11px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-        ctx.textAlign = "center";
-        ctx.fillStyle = "#98abd5";
-        ctx.fillText(
-          item.node.children.length + " nested",
-          item.x + item.width / 2,
-          item.y + item.height / 2 + 12
-        );
-      }
+      drawNode(item.node, item.x, item.y, item.visibleDepth, 1);
     }
 
     ctx.restore();
