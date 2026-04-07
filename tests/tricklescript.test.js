@@ -145,7 +145,7 @@ return
   assert.equal(jumpEdge.viaGoto, true);
 });
 
-test("buildFlowGraph renders return as a normal process node", () => {
+test("buildFlowGraph omits return nodes", () => {
   const source = `
 main:
 doThing
@@ -154,9 +154,11 @@ return
 
   const graph = TrickleScript.buildFlowGraph(source, { entry: "main" });
   const returnNode = graph.nodes.find((node) => node.label === "return");
+  const doThing = graph.nodes.find((node) => node.label === "doThing");
+  const edgeToEnd = graph.edges.find((edge) => edge.from === doThing.id && edge.to === "end");
 
-  assert.ok(returnNode);
-  assert.equal(returnNode.type, "process");
+  assert.equal(returnNode, undefined);
+  assert.ok(edgeToEnd);
 });
 
 test("unknown goto labels are rejected", () => {

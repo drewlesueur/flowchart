@@ -359,7 +359,7 @@
 
     for (let i = 0; i < routine.instructions.length; i += 1) {
       const instruction = routine.instructions[i];
-      if (instruction.type === "operation" || instruction.type === "otherwiseGoto" || instruction.type === "return") {
+      if (instruction.type === "operation" || instruction.type === "otherwiseGoto") {
         const node = {
           id: "n" + nodes.length,
           instructionIndex: i,
@@ -400,6 +400,10 @@
         if (instruction.type === "goto") {
           current = routine.labels[instruction.target];
           continue;
+        }
+
+        if (instruction.type === "return") {
+          return null;
         }
 
         return null;
