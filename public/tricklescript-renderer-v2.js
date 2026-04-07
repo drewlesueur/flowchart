@@ -7,12 +7,12 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function() {
   const NODE_W = 176;
   const NODE_H = 56;
-  const GAP_Y = 34;
-  const BRANCH_GAP = 24;
-  const BRANCH_X = 264;
-  const BUBBLE_MIN_W = 208;
-  const BUBBLE_MIN_H = 120;
-  const BUBBLE_PAD = 22;
+  const NODE_GAP_Y = 28;
+  const BRANCH_X = 228;
+  const BRANCH_Y = 24;
+  const BUBBLE_W = 206;
+  const BUBBLE_H = 118;
+  const BUBBLE_HEADER = 24;
   const PADDING = 48;
   const CULL_PAD = 220;
   const FONT_STACK = '"Courier New", monospace';
@@ -28,10 +28,8 @@
   }
 
   function getDetailDepth(zoom) {
-    if (zoom < 0.8) return 0;
-    if (zoom < 1.45) return 1;
-    if (zoom < 2.2) return 2;
-    return 4;
+    if (zoom < 0.9) return 0;
+    return 1 + Math.floor(Math.log2(zoom / 0.9));
   }
 
   function buildFlowTree(graph) {
@@ -137,9 +135,6 @@
           items.push({
             kind: "decision",
             nodeId: currentId,
-            yesId,
-            noId,
-            mergeId,
             yes: buildSequence(yesId, branchStop, nextPath),
             no: buildSequence(noId, branchStop, nextPath)
           });
@@ -157,9 +152,31 @@
     return {
       graph,
       nodeMap,
-      edgeMap,
       root: buildSequence("start", new Set(), new Set())
     };
+  }
+
+  function buildRecursiveModel(tree) {
+    function buildSegment(items) {
+      if (!items || !items.length) return null;
+      const head = items[0];
+      const rest = items.slice(1);
+      const segment = {
+        kind: head.kind,
+        nodeId: head.nodeId,
+        label: head.label || null,
+        next: buildSegment(rest)
+      };
+
+      if (head.kind === "decision") {
+        segment.yes = buildSegment(head.yes || []);
+        segment.no = buildSegment(head.no || []);
+      }
+
+      return segment;
+    }
+
+    return buildSegment(tree.root);
   }
 
   function buildScene(tree, options) {
@@ -172,12 +189,12 @@
       bottom: Infinity
     };
 
+    const root = buildRecursiveModel(tree);
     const scene = {
       width: 0,
       height: 0,
       paths: [],
       labels: [],
-      badges: [],
       bubbles: [],
       nodes: []
     };
@@ -189,6 +206,13 @@
         x > viewport.right + CULL_PAD ||
         y > viewport.bottom + CULL_PAD
       );
+    }
+
+    function summarizeSegment(segment) {
+      if (!segment) return "Empty";
+      if (segment.kind === "reference") return truncateLabel("Loop to " + segment.label, 20);
+      const node = tree.nodeMap[segment.nodeId];
+      return truncateLabel(node ? node.label : "Branch", 20);
     }
 
     function addNode(nodeId, x, y, mode) {
@@ -212,12 +236,12 @@
       });
     }
 
-    function addReference(item, x, y) {
+    function addReference(segment, x, y) {
       if (!inView(x, y, NODE_W, NODE_H - 12)) return;
       scene.nodes.push({
-        id: item.nodeId,
+        id: segment.nodeId,
         type: "reference",
-        label: "Loop to " + item.label,
+        label: "Loop to " + segment.label,
         x,
         y,
         w: NODE_W,
@@ -225,7 +249,7 @@
         mode: "summary"
       });
       scene.labels.push({
-        text: "Loop to " + item.label,
+        text: "Loop to " + segment.label,
         x: x + NODE_W / 2,
         y: y + (NODE_H - 12) / 2,
         kind: "reference"
@@ -247,144 +271,134 @@
       scene.paths.push({ points, mode });
     }
 
-    function addBadge(text, x, y) {
-      if (!inView(x, y, 40, 18)) return;
-      scene.badges.push({ text, x, y });
+    function addBubble(bubble) {
+      if (!inView(bubble.x, bubble.y, bubble.w, bubble.h)) return;
+      scene.bubbles.push(bubble);
     }
 
-    function addBubble(x, y, width, height, label, direction, expanded, summary) {
-      if (!inView(x, y, width, height)) return;
-      scene.bubbles.push({ x, y, w: width, h: height, label, direction, expanded, summary });
-    }
-
-    function layoutSequence(items, x, y, depth) {
-      let cursorY = y;
-      let prevExit = null;
-      let maxRight = x + NODE_W;
-
-      for (const item of items) {
-        const layout = layoutItem(item, x, cursorY, depth);
-        if (prevExit && layout.entry) {
-          addPath([
-            prevExit,
-            { x: prevExit.x, y: prevExit.y + GAP_Y / 2 },
-            { x: layout.entry.x, y: layout.entry.y - GAP_Y / 2 },
-            layout.entry
-          ], "main");
-        }
-        prevExit = layout.exit;
-        cursorY += layout.height + GAP_Y;
-        maxRight = Math.max(maxRight, layout.right);
+    function layoutSegment(segment, x, y, depth) {
+      if (!segment) {
+        return { bottom: y, right: x, entry: null, exit: null };
       }
 
-      return {
-        width: maxRight - x,
-        height: Math.max(0, cursorY - y - GAP_Y),
-        entry: items.length ? { x: x + NODE_W / 2, y } : null,
-        exit: prevExit,
-        right: maxRight
-      };
-    }
-
-    function layoutItem(item, x, y, depth) {
-      if (item.kind === "reference") {
-        addReference(item, x, y + 6);
+      if (segment.kind === "reference") {
+        addReference(segment, x, y + 6);
         return {
-          height: NODE_H - 12,
+          bottom: y + NODE_H - 6,
+          right: x + NODE_W,
           entry: { x: x + NODE_W / 2, y: y + 6 },
-          exit: { x: x + NODE_W / 2, y: y + NODE_H - 6 },
-          right: x + NODE_W
+          exit: { x: x + NODE_W / 2, y: y + NODE_H - 6 }
         };
       }
 
-      if (item.kind === "node") {
-        addNode(item.nodeId, x, y, depth > 0 ? "detail" : "summary");
-        return {
-          height: NODE_H,
-          entry: { x: x + NODE_W / 2, y },
-          exit: { x: x + NODE_W / 2, y: y + NODE_H },
-          right: x + NODE_W
+      addNode(segment.nodeId, x, y, depth > 0 ? "detail" : "summary");
+      const nodeBottom = y + NODE_H;
+      let bottom = nodeBottom;
+      let right = x + NODE_W;
+      let exit = { x: x + NODE_W / 2, y: nodeBottom };
+
+      if (segment.kind === "decision") {
+        const yesBubble = {
+          x: x + BRANCH_X,
+          y: y - 2,
+          w: BUBBLE_W,
+          h: BUBBLE_H,
+          label: "Yes",
+          direction: "right",
+          expanded: depth < depthLimit,
+          summary: summarizeSegment(segment.yes)
         };
+        const noBubble = {
+          x,
+          y: y + NODE_H + BRANCH_Y,
+          w: BUBBLE_W,
+          h: BUBBLE_H,
+          label: "No",
+          direction: "down",
+          expanded: depth < depthLimit,
+          summary: summarizeSegment(segment.no)
+        };
+
+        addBubble(yesBubble);
+        addBubble(noBubble);
+
+        addPath([
+          { x: x + NODE_W, y: y + NODE_H / 2 },
+          { x: yesBubble.x, y: yesBubble.y + yesBubble.h / 2 }
+        ], "branch");
+        addPath([
+          { x: x + NODE_W / 2, y: nodeBottom },
+          { x: x + NODE_W / 2, y: noBubble.y },
+          { x: noBubble.x + noBubble.w / 2, y: noBubble.y }
+        ], "branch");
+
+        if (depth < depthLimit) {
+          const yesInner = layoutSegment(segment.yes, yesBubble.x + (yesBubble.w - NODE_W) / 2, yesBubble.y + BUBBLE_HEADER + 18, depth + 1);
+          const noInner = layoutSegment(segment.no, noBubble.x + (noBubble.w - NODE_W) / 2, noBubble.y + BUBBLE_HEADER + 18, depth + 1);
+          right = Math.max(right, yesInner.right, noInner.right, yesBubble.x + yesBubble.w, noBubble.x + noBubble.w);
+          bottom = Math.max(bottom, yesInner.bottom, noInner.bottom, yesBubble.y + yesBubble.h, noBubble.y + noBubble.h);
+        } else {
+          right = Math.max(right, yesBubble.x + yesBubble.w, noBubble.x + noBubble.w);
+          bottom = Math.max(bottom, yesBubble.y + yesBubble.h, noBubble.y + noBubble.h);
+        }
+
+        const mergeY = bottom + 24;
+        const mergeX = x + NODE_W / 2;
+        addPath([
+          { x: yesBubble.x + yesBubble.w / 2, y: yesBubble.y + yesBubble.h },
+          { x: yesBubble.x + yesBubble.w / 2, y: mergeY },
+          { x: mergeX, y: mergeY }
+        ], "merge");
+        addPath([
+          { x: noBubble.x + noBubble.w / 2, y: noBubble.y + noBubble.h },
+          { x: noBubble.x + noBubble.w / 2, y: mergeY },
+          { x: mergeX, y: mergeY }
+        ], "merge");
+
+        bottom = mergeY;
+        exit = { x: mergeX, y: mergeY };
       }
 
-      addNode(item.nodeId, x, y, depth > 0 ? "detail" : "summary");
-      const expandBranches = depth < depthLimit;
-      const yesInner = expandBranches && item.yes.length
-        ? layoutSequence(item.yes, x + BRANCH_X + BUBBLE_PAD, y + BUBBLE_PAD, depth + 1)
-        : null;
-      const noInner = expandBranches && item.no.length
-        ? layoutSequence(item.no, x + BUBBLE_PAD, y + NODE_H + BRANCH_GAP + BUBBLE_PAD, depth + 1)
-        : null;
+      if (segment.next) {
+        const nextBubble = {
+          x,
+          y: bottom + NODE_GAP_Y,
+          w: BUBBLE_W,
+          h: BUBBLE_H,
+          label: "Next",
+          direction: "down",
+          expanded: depth < depthLimit,
+          summary: summarizeSegment(segment.next)
+        };
+        addBubble(nextBubble);
+        addPath([
+          exit,
+          { x: exit.x, y: nextBubble.y },
+          { x: nextBubble.x + nextBubble.w / 2, y: nextBubble.y }
+        ], "main");
 
-      const yesBubble = {
-        x: x + BRANCH_X,
-        y,
-        w: Math.max(BUBBLE_MIN_W, yesInner ? yesInner.width + BUBBLE_PAD * 2 : BUBBLE_MIN_W),
-        h: Math.max(BUBBLE_MIN_H, yesInner ? yesInner.height + BUBBLE_PAD * 2 : BUBBLE_MIN_H)
-      };
-      const noBubble = {
-        x,
-        y: y + NODE_H + BRANCH_GAP,
-        w: Math.max(BUBBLE_MIN_W, noInner ? noInner.width + BUBBLE_PAD * 2 : BUBBLE_MIN_W),
-        h: Math.max(BUBBLE_MIN_H, noInner ? noInner.height + BUBBLE_PAD * 2 : BUBBLE_MIN_H)
-      };
-
-      addBubble(
-        yesBubble.x,
-        yesBubble.y,
-        yesBubble.w,
-        yesBubble.h,
-        "Yes",
-        "right",
-        expandBranches,
-        item.yes[0] ? truncateLabel(tree.nodeMap[item.yes[0].nodeId || item.yes[0].label]?.label || item.yes[0].label || "Branch", 20) : "Empty"
-      );
-      addBubble(
-        noBubble.x,
-        noBubble.y,
-        noBubble.w,
-        noBubble.h,
-        "No",
-        "down",
-        expandBranches,
-        item.no[0] ? truncateLabel(tree.nodeMap[item.no[0].nodeId || item.no[0].label]?.label || item.no[0].label || "Branch", 20) : "Empty"
-      );
-
-      addPath([
-        { x: x + NODE_W, y: y + NODE_H / 2 },
-        { x: yesBubble.x, y: yesBubble.y + yesBubble.h / 2 }
-      ], "branch");
-      addPath([
-        { x: x + NODE_W / 2, y: y + NODE_H },
-        { x: x + NODE_W / 2, y: noBubble.y },
-        { x: noBubble.x + noBubble.w / 2, y: noBubble.y }
-      ], "branch");
-
-      const mergeY = noBubble.y + noBubble.h + 28;
-      const mergeX = x + NODE_W / 2;
-
-      addPath([
-        { x: yesBubble.x + yesBubble.w / 2, y: yesBubble.y + yesBubble.h },
-        { x: yesBubble.x + yesBubble.w / 2, y: mergeY },
-        { x: mergeX, y: mergeY }
-      ], "merge");
-      addPath([
-        { x: noBubble.x + noBubble.w / 2, y: noBubble.y + noBubble.h },
-        { x: noBubble.x + noBubble.w / 2, y: mergeY },
-        { x: mergeX, y: mergeY }
-      ], "merge");
+        if (depth < depthLimit) {
+          const nextInner = layoutSegment(segment.next, nextBubble.x + (nextBubble.w - NODE_W) / 2, nextBubble.y + BUBBLE_HEADER + 18, depth + 1);
+          right = Math.max(right, nextInner.right, nextBubble.x + nextBubble.w);
+          bottom = Math.max(nextInner.bottom, nextBubble.y + nextBubble.h);
+        } else {
+          right = Math.max(right, nextBubble.x + nextBubble.w);
+          bottom = Math.max(bottom, nextBubble.y + nextBubble.h);
+        }
+        exit = { x: nextBubble.x + nextBubble.w / 2, y: bottom };
+      }
 
       return {
-        height: mergeY - y,
+        bottom,
+        right,
         entry: { x: x + NODE_W / 2, y },
-        exit: { x: mergeX, y: mergeY },
-        right: Math.max(x + NODE_W, yesBubble.x + yesBubble.w, noBubble.x + noBubble.w)
+        exit
       };
     }
 
-    const layout = layoutSequence(tree.root, PADDING, PADDING, 0);
-    scene.width = Math.max(layout.right + PADDING, 820);
-    scene.height = Math.max(layout.height + PADDING * 2, 640);
+    const layout = layoutSegment(root, PADDING, PADDING, 0);
+    scene.width = Math.max(layout.right + PADDING, 860);
+    scene.height = Math.max(layout.bottom + PADDING, 680);
     return scene;
   }
 
@@ -450,28 +464,26 @@
     }
 
     for (const bubble of scene.bubbles) {
-      drawRoundedRect(ctx, bubble.x, bubble.y, bubble.w, bubble.h, 24);
-      ctx.fillStyle = bubble.expanded ? "rgba(23, 34, 60, 0.82)" : "rgba(16, 24, 45, 0.92)";
-      ctx.strokeStyle = bubble.label === "Yes" ? "#6fd6a0" : "#ff9f9f";
-      ctx.lineWidth = bubble.expanded ? 2 : 1.6;
+      drawRoundedRect(ctx, bubble.x, bubble.y, bubble.w, bubble.h, 18);
+      ctx.fillStyle = bubble.expanded ? "rgba(18, 26, 48, 0.9)" : "rgba(12, 18, 34, 0.95)";
+      ctx.strokeStyle = bubble.label === "Yes" ? "#6fd6a0" : bubble.label === "No" ? "#ff9f9f" : "#8aa4ff";
+      ctx.lineWidth = 1.4;
       ctx.fill();
       ctx.stroke();
 
       ctx.font = `11px ${UI_FONT}`;
       ctx.textAlign = "left";
       ctx.textBaseline = "top";
-      ctx.fillStyle = bubble.label === "Yes" ? "#8df0b3" : "#ffb1b1";
-      ctx.fillText(bubble.label, bubble.x + 14, bubble.y + 10);
+      ctx.fillStyle = bubble.label === "Yes" ? "#8df0b3" : bubble.label === "No" ? "#ffb1b1" : "#b4c2ff";
+      ctx.fillText(bubble.label, bubble.x + 12, bubble.y + 8);
 
-      ctx.font = `12px ${FONT_STACK}`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillStyle = bubble.expanded ? "#9ab0dd" : "#d8e2ff";
-      ctx.fillText(
-        bubble.expanded ? "Zoomed in" : bubble.summary,
-        bubble.x + bubble.w / 2,
-        bubble.expanded ? bubble.y + 18 : bubble.y + bubble.h / 2
-      );
+      if (!bubble.expanded) {
+        ctx.font = `12px ${FONT_STACK}`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillStyle = "#d8e2ff";
+        ctx.fillText(bubble.summary, bubble.x + bubble.w / 2, bubble.y + bubble.h / 2 + 4);
+      }
     }
 
     for (const node of scene.nodes) {
@@ -505,7 +517,7 @@
       }
 
       const fill = node.type === "start" ? "#15345d" : node.type === "end" ? "#17162b" : "#1b2440";
-      const radius = (node.type === "start" || node.type === "end") ? 26 : 14;
+      const radius = node.type === "start" || node.type === "end" ? 26 : 14;
       drawRoundedRect(ctx, node.x, node.y, node.w, node.h, radius);
       ctx.fillStyle = fill;
       ctx.strokeStyle = "#6b8fd6";
@@ -535,7 +547,7 @@
 
     const hint = document.createElement("div");
     hint.className = "phase2-hint";
-    hint.textContent = "Canvas explorer. Scroll to zoom. Drag to pan. Nested branches open as you zoom in.";
+    hint.textContent = "Canvas explorer. Scroll to zoom. Drag to pan. Zooming reveals deeper recursive bubbles.";
 
     const viewportEl = document.createElement("div");
     viewportEl.className = "phase2-viewport";
@@ -549,13 +561,13 @@
 
     const ctx = canvas.getContext("2d");
     const state = {
-      zoom: 1,
+      zoom: 1.8,
       panX: 0,
       panY: 24,
       dpr: 1
     };
 
-    const maxScene = buildScene(tree, { zoom: 3 });
+    const maxScene = buildScene(tree, { zoom: 14 });
     let rafId = 0;
     let drag = null;
     let resizeObserver = null;
@@ -599,7 +611,7 @@
 
     function centerInitial() {
       const width = viewportEl.clientWidth || 800;
-      state.panX = Math.max(0, (width - maxScene.width * state.zoom) / 2);
+      state.panX = Math.max(0, (width - maxScene.width * Math.min(state.zoom, 1.8)) / 2);
       state.panY = 24;
     }
 
@@ -610,7 +622,7 @@
       const localY = event.clientY - rect.top;
       const worldX = (localX - state.panX) / state.zoom;
       const worldY = (localY - state.panY) / state.zoom;
-      const nextZoom = clamp(state.zoom * (event.deltaY < 0 ? 1.14 : 0.88), 0.45, 3.4);
+      const nextZoom = clamp(state.zoom * (event.deltaY < 0 ? 1.16 : 0.86), 0.45, 14);
       state.panX = localX - worldX * nextZoom;
       state.panY = localY - worldY * nextZoom;
       state.zoom = nextZoom;
@@ -676,6 +688,7 @@
 
   return {
     buildFlowTree,
+    buildRecursiveModel,
     buildScene,
     getDetailDepth,
     mount

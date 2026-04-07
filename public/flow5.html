@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flow 5</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #111525;
+  color: #e8eefc;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 18px;
+  background: #1a223d;
+  border-bottom: 1px solid #26345d;
+}
+h1 {
+  font-size: 16px;
+  color: #ff8f6b;
+}
+.status {
+  margin-left: auto;
+  font-size: 12px;
+  color: #99a7ca;
+}
+.container {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(300px, 38%) 1fr;
+}
+.left, .right {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.left {
+  border-right: 1px solid #26345d;
+}
+.pane-title {
+  padding: 8px 12px;
+  background: #1a223d;
+  border-bottom: 1px solid #26345d;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-size: 12px;
+  color: #99a7ca;
+}
+textarea {
+  flex: 1;
+  width: 100%;
+  resize: none;
+  border: none;
+  outline: none;
+  background: #0b1020;
+  color: #e8eefc;
+  padding: 14px;
+  font: 14px/1.5 "Courier New", monospace;
+  tab-size: 2;
+}
+.right {
+  background: #0f1426;
+}
+.viewport {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at top, rgba(113, 182, 255, 0.12), transparent 28%),
+    linear-gradient(180deg, #10172c, #0b1020);
+  cursor: grab;
+  touch-action: none;
+}
+.viewport:active {
+  cursor: grabbing;
+}
+canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.helper {
+  padding: 8px 12px;
+  font-size: 12px;
+  color: #99a7ca;
+  border-bottom: 1px solid #26345d;
+  background: rgba(26, 34, 61, 0.7);
+}
+@media (max-width: 900px) {
+  .container {
+    grid-template-columns: 1fr;
+    grid-template-rows: 42vh 1fr;
+  }
+  .left {
+    border-right: none;
+    border-bottom: 1px solid #26345d;
+  }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>Flow 5</h1>
+  <div>Indented Bubble Prototype</div>
+  <div class="status" id="status">Ready</div>
+</header>
+<div class="container">
+  <section class="left">
+    <div class="pane-title">Nested Source</div>
+    <textarea id="source" spellcheck="false">Node1
+  InnerNode1
+  InnerNode2
+    more here
+    still deeper
+      final layer
+Node2
+  Child A
+  Child B
+    Child B.1
+    Child B.2</textarea>
+  </section>
+  <section class="right">
+    <div class="pane-title">Bubble View</div>
+    <div class="helper">Scroll to zoom. Drag to pan. More nested bubbles appear as you zoom in.</div>
+    <div class="viewport" id="viewport">
+      <canvas id="canvas"></canvas>
+    </div>
+  </section>
+</div>
+<script>
+(function() {
+  const sourceEl = document.getElementById("source");
+  const viewportEl = document.getElementById("viewport");
+  const canvas = document.getElementById("canvas");
+  const statusEl = document.getElementById("status");
+  const ctx = canvas.getContext("2d");
+
+  const NODE_W = 220;
+  const NODE_MIN_H = 66;
+  const HEADER_H = 34;
+  const INNER_PAD = 14;
+  const CHILD_GAP = 12;
+  const ROOT_GAP = 24;
+  const MARGIN = 56;
+
+  const camera = {
+    zoom: 1,
+    panX: 0,
+    panY: 24,
+    dpr: 1
+  };
+
+  let tree = [];
+  let layout = [];
+  let world = { width: 900, height: 700 };
+  let drag = null;
+  let rafId = 0;
+  let resizeObserver = null;
+
+  function clamp(value, min, max) {
+    return Math.min(max, Math.max(min, value));
+  }
+
+  function detailDepth(zoom) {
+    if (zoom < 0.9) return 0;
+    return 1 + Math.floor(Math.log2(zoom / 0.9));
+  }
+
+  function truncate(value, max) {
+    return value.length <= max ? value : value.slice(0, max - 1) + "\u2026";
+  }
+
+  function parseSource(text) {
+    const root = [];
+    const stack = [{ indent: -1, children: root }];
+    const lines = text.replace(/\r\n/g, "\n").split("\n");
+
+    for (const rawLine of lines) {
+      if (!rawLine.trim()) continue;
+      const match = rawLine.match(/^(\s*)(.*)$/);
+      const spaces = match[1].replace(/\t/g, "  ").length;
+      const indent = Math.floor(spaces / 2);
+      const label = match[2].trim();
+      const node = { label, children: [] };
+
+      while (stack.length > 1 && indent <= stack[stack.length - 1].indent) {
+        stack.pop();
+      }
+
+      stack[stack.length - 1].children.push(node);
+      stack.push({ indent, children: node.children });
+    }
+
+    return root;
+  }
+
+  function measureNode(node, visibleDepth) {
+    if (visibleDepth <= 0 || !node.children.length) {
+      return { width: NODE_W, height: NODE_MIN_H };
+    }
+
+    let maxChildW = 0;
+    let totalChildH = 0;
+    for (let i = 0; i < node.children.length; i += 1) {
+      const childBox = measureNode(node.children[i], visibleDepth - 1);
+      maxChildW = Math.max(maxChildW, childBox.width);
+      totalChildH += childBox.height;
+      if (i < node.children.length - 1) totalChildH += CHILD_GAP;
+    }
+
+    return {
+      width: Math.max(NODE_W, maxChildW + INNER_PAD * 2),
+      height: HEADER_H + INNER_PAD + totalChildH + INNER_PAD
+    };
+  }
+
+  function layoutNode(node, x, y, visibleDepth, output) {
+    const box = measureNode(node, visibleDepth);
+    output.push({
+      type: "bubble",
+      node,
+      x,
+      y,
+      width: box.width,
+      height: box.height,
+      visibleDepth
+    });
+
+    if (visibleDepth <= 0 || !node.children.length) return box;
+
+    let childY = y + HEADER_H + INNER_PAD;
+    for (const child of node.children) {
+      const childBox = measureNode(child, visibleDepth - 1);
+      const childX = x + (box.width - childBox.width) / 2;
+      layoutNode(child, childX, childY, visibleDepth - 1, output);
+      childY += childBox.height + CHILD_GAP;
+    }
+
+    return box;
+  }
+
+  function relayout() {
+    tree = parseSource(sourceEl.value);
+    const depth = detailDepth(camera.zoom);
+    layout = [];
+    let y = MARGIN;
+    let maxWidth = 0;
+
+    for (const node of tree) {
+      const box = layoutNode(node, MARGIN, y, depth, layout);
+      y += box.height + ROOT_GAP;
+      maxWidth = Math.max(maxWidth, box.width);
+    }
+
+    world.width = Math.max(900, maxWidth + MARGIN * 2);
+    world.height = Math.max(700, y + MARGIN);
+    statusEl.textContent = `${tree.length} roots • depth ${depth} • zoom ${camera.zoom.toFixed(2)}x`;
+  }
+
+  function worldViewport(width, height) {
+    return {
+      left: (-camera.panX) / camera.zoom,
+      top: (-camera.panY) / camera.zoom,
+      right: (width - camera.panX) / camera.zoom,
+      bottom: (height - camera.panY) / camera.zoom
+    };
+  }
+
+  function inView(item, view) {
+    return !(
+      item.x + item.width < view.left - 220 ||
+      item.y + item.height < view.top - 220 ||
+      item.x > view.right + 220 ||
+      item.y > view.bottom + 220
+    );
+  }
+
+  function roundedRect(x, y, width, height, radius) {
+    const r = Math.min(radius, width / 2, height / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + width, y, x + width, y + height, r);
+    ctx.arcTo(x + width, y + height, x, y + height, r);
+    ctx.arcTo(x, y + height, x, y, r);
+    ctx.arcTo(x, y, x + width, y, r);
+    ctx.closePath();
+  }
+
+  function ensureCanvasSize() {
+    const width = viewportEl.clientWidth || 800;
+    const height = viewportEl.clientHeight || 640;
+    camera.dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.floor(width * camera.dpr);
+    canvas.height = Math.floor(height * camera.dpr);
+    canvas.style.width = width + "px";
+    canvas.style.height = height + "px";
+    return { width, height };
+  }
+
+  function draw() {
+    const size = ensureCanvasSize();
+    const view = worldViewport(size.width, size.height);
+
+    ctx.setTransform(camera.dpr, 0, 0, camera.dpr, 0, 0);
+    ctx.clearRect(0, 0, size.width, size.height);
+
+    const bg = ctx.createLinearGradient(0, 0, 0, size.height);
+    bg.addColorStop(0, "#121933");
+    bg.addColorStop(1, "#0a0f1d");
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, size.width, size.height);
+
+    ctx.save();
+    ctx.translate(camera.panX, camera.panY);
+    ctx.scale(camera.zoom, camera.zoom);
+
+    ctx.fillStyle = "rgba(113, 182, 255, 0.05)";
+    ctx.beginPath();
+    ctx.arc(world.width * 0.4, 30, 240, 0, Math.PI * 2);
+    ctx.fill();
+
+    for (const item of layout) {
+      if (!inView(item, view)) continue;
+
+      roundedRect(item.x, item.y, item.width, item.height, 18);
+      ctx.fillStyle = item.visibleDepth > 0 ? "rgba(25, 37, 68, 0.92)" : "rgba(16, 24, 45, 0.96)";
+      ctx.strokeStyle = item.visibleDepth > 0 ? "#7fb4ff" : "#5f7fb8";
+      ctx.lineWidth = 1.4;
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = "rgba(255,255,255,0.05)";
+      roundedRect(item.x, item.y, item.width, HEADER_H, 18);
+      ctx.fill();
+
+      ctx.font = '12px "Courier New", monospace';
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = "#eef4ff";
+      ctx.fillText(item.node.label, item.x + 12, item.y + HEADER_H / 2);
+
+      if (item.visibleDepth <= 0 && item.node.children.length) {
+        ctx.font = '11px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+        ctx.textAlign = "center";
+        ctx.fillStyle = "#98abd5";
+        ctx.fillText(
+          item.node.children.length + " nested",
+          item.x + item.width / 2,
+          item.y + item.height / 2 + 12
+        );
+      }
+    }
+
+    ctx.restore();
+  }
+
+  function scheduleDraw() {
+    if (rafId) return;
+    rafId = window.requestAnimationFrame(() => {
+      rafId = 0;
+      relayout();
+      draw();
+    });
+  }
+
+  function centerView() {
+    const width = viewportEl.clientWidth || 800;
+    camera.panX = Math.max(24, (width - world.width * Math.min(camera.zoom, 1)) / 2);
+    camera.panY = 24;
+  }
+
+  sourceEl.addEventListener("input", scheduleDraw);
+  sourceEl.addEventListener("keydown", (event) => {
+    if (event.key !== "Tab") return;
+    event.preventDefault();
+    const start = sourceEl.selectionStart;
+    const end = sourceEl.selectionEnd;
+    sourceEl.value = sourceEl.value.slice(0, start) + "  " + sourceEl.value.slice(end);
+    sourceEl.selectionStart = sourceEl.selectionEnd = start + 2;
+    scheduleDraw();
+  });
+
+  viewportEl.addEventListener("wheel", (event) => {
+    event.preventDefault();
+    const rect = viewportEl.getBoundingClientRect();
+    const localX = event.clientX - rect.left;
+    const localY = event.clientY - rect.top;
+    const worldX = (localX - camera.panX) / camera.zoom;
+    const worldY = (localY - camera.panY) / camera.zoom;
+    const nextZoom = clamp(camera.zoom * (event.deltaY < 0 ? 1.14 : 0.88), 0.45, 18);
+    camera.panX = localX - worldX * nextZoom;
+    camera.panY = localY - worldY * nextZoom;
+    camera.zoom = nextZoom;
+    scheduleDraw();
+  }, { passive: false });
+
+  viewportEl.addEventListener("pointerdown", (event) => {
+    drag = { x: event.clientX, y: event.clientY, panX: camera.panX, panY: camera.panY };
+    viewportEl.setPointerCapture(event.pointerId);
+  });
+
+  viewportEl.addEventListener("pointermove", (event) => {
+    if (!drag) return;
+    camera.panX = drag.panX + (event.clientX - drag.x);
+    camera.panY = drag.panY + (event.clientY - drag.y);
+    scheduleDraw();
+  });
+
+  function stopDrag(event) {
+    if (!drag) return;
+    drag = null;
+    if (viewportEl.hasPointerCapture(event.pointerId)) {
+      viewportEl.releasePointerCapture(event.pointerId);
+    }
+  }
+
+  viewportEl.addEventListener("pointerup", stopDrag);
+  viewportEl.addEventListener("pointercancel", stopDrag);
+
+  if (typeof window.ResizeObserver === "function") {
+    resizeObserver = new window.ResizeObserver(() => scheduleDraw());
+    resizeObserver.observe(viewportEl);
+  } else {
+    window.addEventListener("resize", scheduleDraw);
+  }
+
+  relayout();
+  centerView();
+  draw();
+})();
+</script>
+</body>
+</html>

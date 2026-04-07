@@ -337,15 +337,41 @@ return
 
   const tree = TrickleScriptRendererV2.buildFlowTree(TrickleScript.buildFlowGraph(source, { entry: "main" }));
   const lowZoom = TrickleScriptRendererV2.buildScene(tree, { zoom: 0.7 });
-  const highZoom = TrickleScriptRendererV2.buildScene(tree, { zoom: 2.4 });
+  const midZoom = TrickleScriptRendererV2.buildScene(tree, { zoom: 1.8 });
+  const highZoom = TrickleScriptRendererV2.buildScene(tree, { zoom: 7.2 });
 
   assert.ok(lowZoom.labels.length < highZoom.labels.length);
-  assert.equal(lowZoom.bubbles.find((bubble) => bubble.label === "Yes").direction, "right");
-  assert.equal(lowZoom.bubbles.find((bubble) => bubble.label === "No").direction, "down");
-  assert.equal(lowZoom.bubbles.find((bubble) => bubble.label === "Yes").expanded, false);
+  assert.equal(lowZoom.bubbles[0].label, "Next");
+  assert.ok(midZoom.bubbles.some((bubble) => bubble.label === "Yes" && bubble.direction === "right"));
+  assert.ok(midZoom.bubbles.some((bubble) => bubble.label === "No" && bubble.direction === "down"));
   assert.ok(highZoom.bubbles.some((bubble) => bubble.label === "Yes" && bubble.expanded));
+  assert.ok(highZoom.bubbles.length > midZoom.bubbles.length);
   assert.equal(TrickleScriptRendererV2.getDetailDepth(0.7), 0);
-  assert.equal(TrickleScriptRendererV2.getDetailDepth(2.4), 4);
+  assert.ok(TrickleScriptRendererV2.getDetailDepth(7.2) > TrickleScriptRendererV2.getDetailDepth(1.8));
+});
+
+test("phase 2 recursively nests bubbles when the focused child is another decision", () => {
+  const source = `
+main:
+guard true eq
+?fallback
+?innerNo
+ship
+return
+innerNo:
+retry
+return
+fallback:
+wait
+return
+`;
+
+  const tree = TrickleScriptRendererV2.buildFlowTree(TrickleScript.buildFlowGraph(source, { entry: "main" }));
+  const lowZoom = TrickleScriptRendererV2.buildScene(tree, { zoom: 0.7 });
+  const highZoom = TrickleScriptRendererV2.buildScene(tree, { zoom: 7.2 });
+
+  assert.equal(lowZoom.bubbles.length, 1);
+  assert.ok(highZoom.bubbles.length > 4);
 });
 
 test("unknown goto labels are rejected", () => {
