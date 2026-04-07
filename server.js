@@ -164,11 +164,6 @@ function listCodeFiles() {
 }
 
 function seedDefaultFiles() {
-  const existingFiles = fs.readdirSync(FILES_DIR).filter((name) => isTrickleScriptFileName(name));
-  if (existingFiles.length > 0) {
-    return;
-  }
-
   const defaults = {
     "order-fulfillment.trk": `main:
 orderPaid true eq
@@ -222,10 +217,176 @@ main:
 "LeSueur" "Drew" greet
 return
 `,
+    "loop-countdown.trk": `main:
+count 3 eq
+?done
+tick
+count 2 eq
+?countWasTwo
+midLoopWork
+*afterTwoCheck
+countWasTwo:
+specialCase
+afterTwoCheck:
+*main
+done:
+finish
+return
+`,
+    "nested-branches.trk": `main:
+x 10 eq
+?outerElse
+leftStart
+y 20 eq
+?leftElse
+leftInnerStart
+z 30 eq
+?leftInnerElse
+leftInnerYes
+*afterInner
+leftInnerElse:
+leftInnerNo
+afterInner:
+*afterOuter
+leftElse:
+leftElseWork
+*afterOuter
+outerElse:
+rightStart
+q 40 eq
+?rightElse
+rightInnerStart
+*afterOuter
+rightElse:
+rightElseWork
+afterOuter:
+finish
+return
+`,
+    "approval-maze.trk": `main:
+hasRequest true eq
+?noRequest
+needsManager true eq
+?skipManager
+askManager
+managerApproved true eq
+?managerRejected
+skipManager:
+needsSecurity true eq
+?skipSecurity
+askSecurity
+securityApproved true eq
+?securityRejected
+skipSecurity:
+shipIt
+return
+managerRejected:
+rework
+return
+securityRejected:
+auditTrail
+return
+noRequest:
+waitForRequest
+return
+`,
+    "retry-loop.trk": `main:
+attempt
+success true eq
+?checkRetries
+done
+return
+checkRetries:
+retryCount 3 eq
+?tryAgain
+giveUp
+return
+tryAgain:
+logRetry
+*main
+`,
+    "diamond-stack.trk": `main:
+cond1 true eq
+?else1
+path1
+cond2 true eq
+?else2
+path2
+cond3 true eq
+?else3
+path3
+*afterAll
+else3:
+path3No
+*afterAll
+else2:
+path2No
+*afterAll
+else1:
+path1No
+afterAll:
+tailWork
+return
+`,
+    "return-sampler.trk": `main:
+firstCheck true eq
+?secondCheck
+firstPath
+return
+secondCheck:
+secondFlag false eq
+?fallback
+secondPath
+return
+fallback:
+lastThing
+return
+`,
+    "funky-join.trk": `main:
+prep
+alpha true eq
+?alphaElse
+alphaYes
+beta true eq
+?betaElse
+betaYes
+*joinPoint
+betaElse:
+betaNo
+*joinPoint
+alphaElse:
+alphaNo
+joinPoint:
+wrapUp
+return
+`,
+    "greeting-variations.trk": `formalGreeting:
+>title
+>lastName
+"Hello " title concat " " concat lastName concat say
+return
+
+casualGreeting:
+>firstName
+"Hey " firstName concat say
+return
+
+main:
+useFormal true eq
+?useCasual
+"LeSueur" "Mr." formalGreeting
+return
+useCasual:
+"Drew" casualGreeting
+return
+`,
   };
 
   for (const [name, contents] of Object.entries(defaults)) {
-    fs.writeFileSync(path.join(FILES_DIR, name), contents, "utf8");
+    const filePath = path.join(FILES_DIR, name);
+    if (!fs.existsSync(filePath)) {
+      fs.writeFileSync(filePath, contents, "utf8");
+    }
   }
 }
 
