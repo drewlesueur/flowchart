@@ -108,7 +108,7 @@
         entryLabel: name,
         line: lineNumber,
         instructions: [],
-        labels: Object.create(null),
+        labels: Object.assign(Object.create(null), { [name]: 0 }),
         params: []
       };
       routines.push(routine);

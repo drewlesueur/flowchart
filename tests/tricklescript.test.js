@@ -154,3 +154,27 @@ return
 
   assert.throws(() => TrickleScript.parse(source), /Unknown label "missingLabel"/);
 });
+
+test("routine entry label can be used as a loop target", () => {
+  const source = `
+main:
+count 3 eq
+?done
+tick
+count 2 eq
+?countWasTwo
+midLoopWork
+*afterTwoCheck
+countWasTwo:
+specialCase
+afterTwoCheck:
+*main
+done:
+finish
+return
+`;
+
+  const program = TrickleScript.parse(source);
+
+  assert.equal(program.routineMap.main.labels.main, 0);
+});
