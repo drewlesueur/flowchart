@@ -36,6 +36,14 @@
       const startY = fromCy;
       const endX = to.x;
       const endY = toCy;
+      if (endX <= startX) {
+        const laneX = Math.max(startX + 56, from.x + from.w + 70);
+        return {
+          d: `M ${startX} ${startY} L ${laneX} ${startY} L ${laneX} ${endY} L ${to.x + to.w} ${endY}`,
+          labelX: startX + 8,
+          labelY: startY - 6
+        };
+      }
       return {
         d: `M ${startX} ${startY} L ${endX} ${endY}`,
         labelX: startX + 8,
@@ -279,8 +287,8 @@
       pos.y = 40 + pos.row * 120;
     }
 
-    let maxRight = graph.totalWidth;
-    let maxBottom = graph.totalHeight;
+    let maxRight = 0;
+    let maxBottom = 0;
     for (const pos of Object.values(positions)) {
       maxRight = Math.max(maxRight, pos.x + pos.w + 130);
       maxBottom = Math.max(maxBottom, pos.y + pos.h + 80);

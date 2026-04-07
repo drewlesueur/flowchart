@@ -2,6 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 
 const TrickleScript = require("../public/tricklescript.js");
+const TrickleScriptRenderer = require("../public/tricklescript-renderer.js");
 
 test("runs concat and say", () => {
   const source = `
@@ -159,6 +160,97 @@ return
 
   assert.equal(returnNode, undefined);
   assert.ok(edgeToEnd);
+});
+
+test("alignYesTargets recomputes chart bounds after compacting rows", () => {
+  const source = `
+main:
+hasRequest true eq
+?noRequest
+needsManager true eq
+?skipManager
+askManager
+managerApproved true eq
+?managerRejected
+skipManager:
+needsSecurity true eq
+?skipSecurity
+askSecurity
+securityApproved true eq
+?securityRejected
+skipSecurity:
+shipIt
+return
+managerRejected:
+rework
+return
+securityRejected:
+auditTrail
+return
+noRequest:
+waitForRequest
+return
+`;
+
+  const graph = TrickleScript.buildFlowGraph(source, { entry: "main" });
+  const aligned = TrickleScriptRenderer.alignYesTargets(graph);
+
+  assert.ok(aligned.totalHeight < graph.totalHeight);
+});
+
+test("render routes leftward yes joins out to the right first", () => {
+  const source = `
+main:
+first true eq
+?skipShared
+second true eq
+?reject
+shared:
+finish
+return
+reject:
+fail
+return
+skipShared:
+wait
+return
+`;
+
+  global.document = {
+    createElementNS(ns, tag) {
+      return {
+        tag,
+        attrs: {},
+        children: [],
+        setAttribute(key, value) { this.attrs[key] = value; },
+        appendChild(child) { this.children.push(child); },
+        textContent: ""
+      };
+    },
+    createElement(tag) {
+      return {
+        tag,
+        attrs: {},
+        children: [],
+        value: "",
+        textContent: "",
+        setAttribute(key, value) { this.attrs[key] = value; },
+        appendChild(child) { this.children.push(child); }
+      };
+    }
+  };
+
+  const graph = TrickleScriptRenderer.alignYesTargets(TrickleScript.buildFlowGraph(source, { entry: "main" }));
+  const mount = { innerHTML: "", children: [], appendChild(child) { this.children.push(child); } };
+  TrickleScriptRenderer.render(graph, mount);
+
+  const svg = mount.children[0];
+  const yesPaths = svg.children
+    .filter((child) => child.tag === "path")
+    .map((child) => child.attrs.d)
+    .filter((d) => typeof d === "string" && d.includes(" L "));
+
+  assert.ok(yesPaths.some((d) => /L \d+ \d+ L \d+ \d+ L \d+ \d+$/.test(d)));
 });
 
 test("unknown goto labels are rejected", () => {
