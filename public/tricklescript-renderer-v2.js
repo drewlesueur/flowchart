@@ -651,7 +651,7 @@
       const localY = event.clientY - rect.top;
       const worldX = (localX - state.panX) / state.zoom;
       const worldY = (localY - state.panY) / state.zoom;
-      const nextZoom = Math.max(0.45, state.zoom * (event.deltaY < 0 ? 1.16 : 0.86));
+      const nextZoom = Math.max(0.45, state.zoom * (event.deltaY < 0 ? 1.08 : 0.92));
       state.panX = localX - worldX * nextZoom;
       state.panY = localY - worldY * nextZoom;
       state.zoom = nextZoom;
