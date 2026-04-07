@@ -147,8 +147,9 @@ Node2
   const NODE_W = 220;
   const NODE_H = 74;
   const HEADER_H = 34;
-  const INNER_PAD = 14;
-  const CHILD_GAP = 12;
+  const INNER_PAD_X = 14;
+  const INNER_PAD_Y = 8;
+  const CHILD_GAP = 6;
   const ROOT_GAP = 24;
   const MARGIN = 56;
 
@@ -314,13 +315,13 @@ Node2
       return;
     }
 
-    const innerX = x + INNER_PAD * scale;
-    const innerY = y + worldHeaderH + INNER_PAD * scale;
-    const innerW = worldWidth - INNER_PAD * 2 * scale;
-    const innerH = worldHeight - worldHeaderH - INNER_PAD * 2 * scale;
+    const innerX = x + INNER_PAD_X * scale;
+    const innerY = y + worldHeaderH + INNER_PAD_Y * scale;
+    const innerW = worldWidth - INNER_PAD_X * 2 * scale;
+    const innerH = worldHeight - worldHeaderH - INNER_PAD_Y * 2 * scale;
     const intrinsicH = childIntrinsicHeight(node, remainingDepth);
-    const gapScale = intrinsicH > 0 ? innerH / intrinsicH : 1;
-    const childScale = Math.min(scale * gapScale, innerW / NODE_W, scale);
+    const heightScale = intrinsicH > 0 ? innerH / intrinsicH : scale;
+    const childScale = Math.min(scale * heightScale, innerW / NODE_W);
     const childGap = CHILD_GAP * childScale;
     const totalH = node.children.length * NODE_H * childScale + Math.max(0, node.children.length - 1) * childGap;
     let childY = innerY + Math.max(0, (innerH - totalH) / 2);
