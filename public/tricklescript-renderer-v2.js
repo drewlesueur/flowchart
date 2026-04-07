@@ -12,11 +12,10 @@
   const BRANCH_Y = 24;
   const BUBBLE_W = 206;
   const BUBBLE_H = 118;
-  const BUBBLE_HEADER = 24;
+  const BUBBLE_HEADER = 18;
   const PADDING = 48;
   const CULL_PAD = 220;
   const FONT_STACK = '"Courier New", monospace';
-  const UI_FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
 
   function clamp(value, min, max) {
     return Math.min(max, Math.max(min, value));
@@ -425,6 +424,18 @@
     ctx.fill();
   }
 
+  function projectX(camera, x) {
+    return camera.panX + x * camera.zoom;
+  }
+
+  function projectY(camera, y) {
+    return camera.panY + y * camera.zoom;
+  }
+
+  function projectL(camera, length) {
+    return length * camera.zoom;
+  }
+
   function drawScene(ctx, scene, camera, viewportWidth, viewportHeight) {
     const dpr = camera.dpr || 1;
     ctx.save();
@@ -437,13 +448,9 @@
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, viewportWidth, viewportHeight);
 
-    ctx.save();
-    ctx.translate(camera.panX, camera.panY);
-    ctx.scale(camera.zoom, camera.zoom);
-
     ctx.fillStyle = "rgba(126, 166, 255, 0.06)";
     ctx.beginPath();
-    ctx.arc(scene.width * 0.45, 48, 260, 0, Math.PI * 2);
+    ctx.arc(projectX(camera, scene.width * 0.45), projectY(camera, 48), projectL(camera, 260), 0, Math.PI * 2);
     ctx.fill();
 
     for (const path of scene.paths) {
@@ -454,58 +461,82 @@
       ctx.lineJoin = "round";
       ctx.beginPath();
       path.points.forEach((point, index) => {
-        if (index === 0) ctx.moveTo(point.x, point.y);
-        else ctx.lineTo(point.x, point.y);
+        const px = projectX(camera, point.x);
+        const py = projectY(camera, point.y);
+        if (index === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
       });
       ctx.stroke();
       if (path.points.length > 1) {
-        drawArrowHead(ctx, path.points[path.points.length - 2], path.points[path.points.length - 1], color);
+        drawArrowHead(ctx, {
+          x: projectX(camera, path.points[path.points.length - 2].x),
+          y: projectY(camera, path.points[path.points.length - 2].y)
+        }, {
+          x: projectX(camera, path.points[path.points.length - 1].x),
+          y: projectY(camera, path.points[path.points.length - 1].y)
+        }, color);
       }
     }
 
     for (const bubble of scene.bubbles) {
-      drawRoundedRect(ctx, bubble.x, bubble.y, bubble.w, bubble.h, 18);
+      const x = projectX(camera, bubble.x);
+      const y = projectY(camera, bubble.y);
+      const w = projectL(camera, bubble.w);
+      const h = projectL(camera, bubble.h);
+      drawRoundedRect(ctx, x, y, w, h, Math.max(8, projectL(camera, 18)));
       ctx.fillStyle = bubble.expanded ? "rgba(18, 26, 48, 0.9)" : "rgba(12, 18, 34, 0.95)";
       ctx.strokeStyle = bubble.label === "Yes" ? "#6fd6a0" : bubble.label === "No" ? "#ff9f9f" : "#8aa4ff";
       ctx.lineWidth = 1.4;
       ctx.fill();
       ctx.stroke();
 
-      ctx.font = `11px ${UI_FONT}`;
+      const pillX = x + projectL(camera, 8);
+      const pillY = y + projectL(camera, 4);
+      const pillW = Math.min(w - projectL(camera, 16), projectL(camera, 94));
+      const pillH = projectL(camera, BUBBLE_HEADER);
+      ctx.fillStyle = "rgba(255,255,255,0.04)";
+      drawRoundedRect(ctx, pillX, pillY, pillW, pillH, Math.max(5, projectL(camera, 7)));
+      ctx.fill();
+
+      ctx.font = `10px ${FONT_STACK}`;
       ctx.textAlign = "left";
-      ctx.textBaseline = "top";
+      ctx.textBaseline = "middle";
       ctx.fillStyle = bubble.label === "Yes" ? "#8df0b3" : bubble.label === "No" ? "#ffb1b1" : "#b4c2ff";
-      ctx.fillText(bubble.label, bubble.x + 12, bubble.y + 8);
+      ctx.fillText(bubble.label, pillX + 8, pillY + pillH / 2);
 
       if (!bubble.expanded) {
-        ctx.font = `12px ${FONT_STACK}`;
+        ctx.font = `10px ${FONT_STACK}`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillStyle = "#d8e2ff";
-        ctx.fillText(bubble.summary, bubble.x + bubble.w / 2, bubble.y + bubble.h / 2 + 4);
+        ctx.fillText(bubble.summary, x + w / 2, y + h / 2 + 4);
       }
     }
 
     for (const node of scene.nodes) {
+      const x = projectX(camera, node.x);
+      const y = projectY(camera, node.y);
+      const w = projectL(camera, node.w);
+      const h = projectL(camera, node.h);
       if (node.type === "decision") {
-        const cx = node.x + node.w / 2;
-        const cy = node.y + node.h / 2;
+        const cx = x + w / 2;
+        const cy = y + h / 2;
         ctx.beginPath();
-        ctx.moveTo(cx, node.y);
-        ctx.lineTo(node.x + node.w, cy);
-        ctx.lineTo(cx, node.y + node.h);
-        ctx.lineTo(node.x, cy);
+        ctx.moveTo(cx, y);
+        ctx.lineTo(x + w, cy);
+        ctx.lineTo(cx, y + h);
+        ctx.lineTo(x, cy);
         ctx.closePath();
         ctx.fillStyle = "#1b2440";
         ctx.strokeStyle = "#ffb44d";
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 1.6;
         ctx.fill();
         ctx.stroke();
         continue;
       }
 
       if (node.type === "reference") {
-        drawRoundedRect(ctx, node.x, node.y, node.w, node.h, 18);
+        drawRoundedRect(ctx, x, y, w, h, Math.max(8, projectL(camera, 18)));
         ctx.fillStyle = "#11182d";
         ctx.strokeStyle = "#53617f";
         ctx.lineWidth = 1.4;
@@ -518,23 +549,21 @@
 
       const fill = node.type === "start" ? "#15345d" : node.type === "end" ? "#17162b" : "#1b2440";
       const radius = node.type === "start" || node.type === "end" ? 26 : 14;
-      drawRoundedRect(ctx, node.x, node.y, node.w, node.h, radius);
+      drawRoundedRect(ctx, x, y, w, h, Math.max(8, projectL(camera, radius)));
       ctx.fillStyle = fill;
       ctx.strokeStyle = "#6b8fd6";
-      ctx.lineWidth = node.mode === "detail" ? 1.9 : 1.4;
+      ctx.lineWidth = 1.4;
       ctx.fill();
       ctx.stroke();
     }
 
-    ctx.font = `12px ${FONT_STACK}`;
+    ctx.font = `10px ${FONT_STACK}`;
     ctx.fillStyle = "#e8edf9";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     for (const label of scene.labels) {
-      ctx.fillText(label.text, label.x, label.y);
+      ctx.fillText(label.text, projectX(camera, label.x), projectY(camera, label.y));
     }
-
-    ctx.restore();
     ctx.restore();
   }
 
@@ -547,7 +576,7 @@
 
     const hint = document.createElement("div");
     hint.className = "phase2-hint";
-    hint.textContent = "Canvas explorer. Scroll to zoom. Drag to pan. Zooming reveals deeper recursive bubbles.";
+    hint.textContent = "Scroll to zoom. Drag to pan. Deeper zoom reveals nested next/yes/no bubbles.";
 
     const viewportEl = document.createElement("div");
     viewportEl.className = "phase2-viewport";
@@ -567,7 +596,7 @@
       dpr: 1
     };
 
-    const maxScene = buildScene(tree, { zoom: 14 });
+    const maxScene = buildScene(tree, { zoom: 18 });
     let rafId = 0;
     let drag = null;
     let resizeObserver = null;
@@ -611,7 +640,7 @@
 
     function centerInitial() {
       const width = viewportEl.clientWidth || 800;
-      state.panX = Math.max(0, (width - maxScene.width * Math.min(state.zoom, 1.8)) / 2);
+      state.panX = Math.max(0, (width - maxScene.width * Math.min(state.zoom, 1)) / 2);
       state.panY = 24;
     }
 
@@ -622,7 +651,7 @@
       const localY = event.clientY - rect.top;
       const worldX = (localX - state.panX) / state.zoom;
       const worldY = (localY - state.panY) / state.zoom;
-      const nextZoom = clamp(state.zoom * (event.deltaY < 0 ? 1.16 : 0.86), 0.45, 14);
+      const nextZoom = Math.max(0.45, state.zoom * (event.deltaY < 0 ? 1.08 : 0.92));
       state.panX = localX - worldX * nextZoom;
       state.panY = localY - worldY * nextZoom;
       state.zoom = nextZoom;

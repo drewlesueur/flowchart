@@ -122,11 +122,68 @@ canvas {
     more here
     still deeper
       final layer
+        level 6
+          level 7
+            level 8
+              level 9
+                level 10
 Node2
   Child A
   Child B
     Child B.1
-    Child B.2</textarea>
+    Child B.2
+      Child B.2.a
+      Child B.2.b
+        Child B.2.b.i
+        Child B.2.b.ii
+QuickNode
+Tiny
+Ladder Start
+  rung 1
+    rung 2
+      rung 3
+        rung 4
+          rung 5
+            rung 6
+              rung 7
+                rung 8
+                  rung 9
+                    rung 10
+Short Burst
+  one
+  two
+  three
+Mixed Root
+  short child
+  medium child
+    medium child deeper
+      medium child deeper still
+  long child
+    long child 2
+      long child 3
+        long child 4
+          long child 5
+            long child 6
+              long child 7
+                long child 8
+Chain Cluster
+  A
+    A2
+      A3
+  B
+    B2
+  C
+    C2
+      C3
+        C4
+          C5
+Last Root
+  alpha
+  beta
+    gamma
+      delta
+        epsilon
+  zeta</textarea>
   </section>
   <section class="right">
     <div class="pane-title">Bubble View</div>
@@ -146,11 +203,15 @@ Node2
 
   const NODE_W = 220;
   const NODE_H = 74;
-  const HEADER_H = 34;
-  const INNER_PAD = 14;
-  const CHILD_GAP = 12;
+  const HEADER_H = 18;
+  const INNER_PAD_X = 1;
+  const INNER_PAD_Y = 3;
+  const CHILD_GAP = 0;
   const ROOT_GAP = 24;
   const MARGIN = 56;
+  const LABEL_PILL_W = 104;
+  const LABEL_PILL_PAD_X = 8;
+  const LABEL_PILL_PAD_Y = 4;
 
   const camera = {
     zoom: 1,
@@ -290,23 +351,28 @@ Node2
     ctx.fill();
     ctx.stroke();
 
-    ctx.fillStyle = "rgba(255,255,255,0.05)";
-    roundedRect(screenX, screenY, width, headerH, radius);
+    const pillX = screenX + projectL(LABEL_PILL_PAD_X * scale);
+    const pillY = screenY + projectL(LABEL_PILL_PAD_Y * scale);
+    const pillW = Math.min(width - projectL(LABEL_PILL_PAD_X * 2 * scale), projectL(LABEL_PILL_W * scale));
+    const pillH = headerH;
+
+    ctx.fillStyle = "rgba(255,255,255,0.04)";
+    roundedRect(pillX, pillY, pillW, pillH, Math.max(5, radius * 0.45));
     ctx.fill();
 
-    ctx.font = `${Math.max(6, projectL(12 * scale))}px "Courier New", monospace`;
+    ctx.font = '10px "Courier New", monospace';
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
     ctx.fillStyle = "#eef4ff";
     ctx.fillText(
-      truncate(node.label, Math.max(8, Math.floor(26 * scale))),
-      screenX + projectL(12 * scale),
-      screenY + headerH / 2
+      truncate(node.label, 18),
+      pillX + projectL(8 * scale),
+      pillY + pillH / 2
     );
 
     if (remainingDepth <= 0 || !node.children.length) {
       if (node.children.length) {
-        ctx.font = `${Math.max(5, projectL(10 * scale))}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+        ctx.font = '10px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
         ctx.textAlign = "center";
         ctx.fillStyle = "#98abd5";
         ctx.fillText(`${node.children.length} nested`, screenX + width / 2, screenY + height / 2 + projectL(10 * scale));
@@ -314,13 +380,14 @@ Node2
       return;
     }
 
-    const innerX = x + INNER_PAD * scale;
-    const innerY = y + worldHeaderH + INNER_PAD * scale;
-    const innerW = worldWidth - INNER_PAD * 2 * scale;
-    const innerH = worldHeight - worldHeaderH - INNER_PAD * 2 * scale;
+    const innerX = x + INNER_PAD_X * scale;
+    const innerY = y + worldHeaderH + INNER_PAD_Y * scale;
+    const innerW = worldWidth - INNER_PAD_X * 2 * scale;
+    const innerH = worldHeight - worldHeaderH - INNER_PAD_Y * 2 * scale;
     const intrinsicH = childIntrinsicHeight(node, remainingDepth);
-    const gapScale = intrinsicH > 0 ? innerH / intrinsicH : 1;
-    const childScale = Math.min(scale * gapScale, innerW / NODE_W, scale);
+    const heightScale = intrinsicH > 0 ? innerH / intrinsicH : scale;
+    const widthScale = innerW / NODE_W;
+    const childScale = Math.min(heightScale, widthScale);
     const childGap = CHILD_GAP * childScale;
     const totalH = node.children.length * NODE_H * childScale + Math.max(0, node.children.length - 1) * childGap;
     let childY = innerY + Math.max(0, (innerH - totalH) / 2);
