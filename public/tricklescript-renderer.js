@@ -270,6 +270,17 @@
     }
 
     for (const edge of graph.edges) {
+      if (edge.label !== "Yes") continue;
+      const from = positions[edge.from];
+      const to = positions[edge.to];
+      if (!from || !to) continue;
+      if (to.x >= from.x || to.row > from.row) continue;
+      const rowsNeeded = from.row + 1 - to.row;
+      if (rowsNeeded <= 0) continue;
+      shiftBranch(edge.to, -rowsNeeded, 0);
+    }
+
+    for (const edge of graph.edges) {
       if (edge.label !== "No") continue;
       const from = positions[edge.from];
       const to = positions[edge.to];

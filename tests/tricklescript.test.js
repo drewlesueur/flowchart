@@ -198,6 +198,44 @@ return
   assert.ok(aligned.totalHeight < graph.totalHeight);
 });
 
+test("alignYesTargets staggers leftward yes joins below the source decision", () => {
+  const source = `
+main:
+hasRequest true eq
+?noRequest
+needsManager true eq
+?skipManager
+askManager
+managerApproved true eq
+?managerRejected
+skipManager:
+needsSecurity true eq
+?skipSecurity
+askSecurity
+securityApproved true eq
+?securityRejected
+skipSecurity:
+shipIt
+return
+managerRejected:
+rework
+return
+securityRejected:
+auditTrail
+return
+noRequest:
+waitForRequest
+return
+`;
+
+  const aligned = TrickleScriptRenderer.alignYesTargets(TrickleScript.buildFlowGraph(source, { entry: "main" }));
+  const managerApproved = aligned.edges.find((edge) => edge.label === "Yes" && edge.from === "n6");
+  const securityApproved = aligned.edges.find((edge) => edge.label === "Yes" && edge.from === "n11");
+
+  assert.ok(aligned.positions[managerApproved.to].row > aligned.positions[managerApproved.from].row);
+  assert.ok(aligned.positions[securityApproved.to].row > aligned.positions[securityApproved.from].row);
+});
+
 test("render routes leftward yes joins out to the right first", () => {
   const source = `
 main:
