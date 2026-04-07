@@ -13,31 +13,29 @@ function escapeHtml(value) {
 }
 
 function defaultContentFor(name) {
-  const baseName = name.replace(/\.[^.]+$/, "").replace(/[^A-Za-z0-9_]/g, "_") || "newFlow";
-  return `function ${baseName}() {\n  \n}\n`;
+  const baseName = name.replace(/\.[^.]+$/, "").replace(/[^A-Za-z0-9_]/g, "_") || "main";
+  return `${baseName}:\nreturn\n`;
 }
 
 function renderList(items) {
   if (!items.length) {
-    sampleList.innerHTML = `<div class="empty-state">No files are available yet. Create one above.</div>`;
-    listStatus.textContent = "0 files.";
+    sampleList.innerHTML = `<div class="empty-state">No TrickleScript files yet. Create one above.</div>`;
+    listStatus.textContent = "0 files";
     return;
   }
 
-  sampleList.innerHTML = items
-    .map(
-      (item) => `<a class="sample-card" href="/detail.html?sample=${encodeURIComponent(item.id)}">
-        <div class="sample-card-head">
-          <h3>${escapeHtml(item.name)}</h3>
-          <span class="sample-pill">${escapeHtml(item.language)}</span>
-        </div>
-        <p>${escapeHtml(item.description)}</p>
-        <span class="sample-open">Open detail view</span>
-      </a>`
-    )
-    .join("");
+  sampleList.innerHTML = items.map((item) => `
+    <a class="file-card" href="/detail.html?sample=${encodeURIComponent(item.id)}">
+      <div class="file-card-head">
+        <h3>${escapeHtml(item.name)}</h3>
+        <span class="pill">${escapeHtml(item.language)}</span>
+      </div>
+      <p>${escapeHtml(item.description)}</p>
+      <span class="file-open">Open code + chart</span>
+    </a>
+  `).join("");
 
-  listStatus.textContent = `${items.length} files available.`;
+  listStatus.textContent = `${items.length} files`;
 }
 
 async function loadList() {
@@ -47,11 +45,10 @@ async function loadList() {
       throw new Error(`HTTP ${response.status}`);
     }
 
-    const items = await response.json();
-    renderList(items);
+    renderList(await response.json());
   } catch (error) {
-    sampleList.innerHTML = `<div class="empty-state">Could not load the file list: ${escapeHtml(error.message)}</div>`;
-    listStatus.textContent = "Load error.";
+    sampleList.innerHTML = `<div class="empty-state">Could not load files: ${escapeHtml(error.message)}</div>`;
+    listStatus.textContent = "Load error";
   }
 }
 
@@ -60,18 +57,16 @@ async function createFile(event) {
 
   const name = newFileNameInput.value.trim();
   if (!name) {
-    createFileStatus.textContent = "Enter a file name first.";
+    createFileStatus.textContent = "Enter a file name.";
     return;
   }
 
-  createFileStatus.textContent = "Creating file...";
+  createFileStatus.textContent = "Creating...";
 
   try {
     const response = await fetch("/api/files", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name,
         content: defaultContentFor(name),

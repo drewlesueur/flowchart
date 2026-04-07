@@ -103,6 +103,11 @@ function isAllowedFileName(name) {
   return /^[A-Za-z0-9._-]+$/.test(name);
 }
 
+function isTrickleScriptFileName(name) {
+  const extension = path.extname(name).toLowerCase();
+  return extension === ".trk" || extension === ".trickle";
+}
+
 function resolveDataFile(name) {
   if (!isAllowedFileName(name)) {
     return null;
@@ -119,23 +124,10 @@ function resolveDataFile(name) {
 }
 
 function inferLanguage(name) {
-  const extension = path.extname(name).toLowerCase();
-  if (extension === ".js") {
-    return "JavaScript";
+  if (isTrickleScriptFileName(name)) {
+    return "TrickleScript";
   }
-  if (extension === ".ts") {
-    return "TypeScript";
-  }
-  if (extension === ".py") {
-    return "Python";
-  }
-  if (extension === ".rb") {
-    return "Ruby";
-  }
-  if (extension === ".java") {
-    return "Java";
-  }
-  return "Code";
+  return "Unsupported";
 }
 
 function summarizeContents(contents) {
@@ -156,6 +148,7 @@ function listCodeFiles() {
     .filter((entry) => entry.isFile())
     .map((entry) => entry.name)
     .filter((name) => isAllowedFileName(name))
+    .filter((name) => isTrickleScriptFileName(name))
     .sort((a, b) => a.localeCompare(b));
 
   return names.map((name) => {
@@ -171,79 +164,63 @@ function listCodeFiles() {
 }
 
 function seedDefaultFiles() {
-  const existingFiles = fs.readdirSync(FILES_DIR);
+  const existingFiles = fs.readdirSync(FILES_DIR).filter((name) => isTrickleScriptFileName(name));
   if (existingFiles.length > 0) {
     return;
   }
 
   const defaults = {
-    "order-fulfillment.js": `function classifyOrder(order) {
-  if (!order.paid) {
-    return "hold";
-  }
+    "order-fulfillment.trk": `main:
+orderPaid true eq
+?paymentHold
+orderHighValue true eq
+?standardReview
+approveOrder
+*afterReview
+standardReview:
+reviewOrder
+afterReview:
+itemsBackordered true eq
+?skipBackorderNotice
+notifyCustomer
+skipBackorderNotice:
+shipOrder
+return
 
-  if (order.total > 1000) {
-    approve(order);
-  } else {
-    review(order);
-  }
-
-  for (const item of order.items) {
-    if (item.backordered) {
-      notifyCustomer(item);
-    }
-  }
-
-  ship(order);
-  return "done";
-}
+paymentHold:
+holdOrder
+return
 `,
-    "incident-triage.js": `function triageIncident(incident) {
-  if (incident.severity === "critical") {
-    pageOnCall();
-  } else {
-    createTicket();
-  }
-
-  while (!incident.mitigated) {
-    attemptRecovery();
-
-    if (incident.customerImpact) {
-      postStatusUpdate();
-    }
-
-    if (incident.retryCount > 2) {
-      escalateIncident();
-      return "escalated";
-    }
-  }
-
-  closeIncident();
-  return "resolved";
-}
+    "incident-triage.trk": `main:
+severity "critical" eq
+?nonCritical
+pageOnCall
+*afterSeverity
+nonCritical:
+createTicket
+afterSeverity:
+customerImpact true eq
+?skipStatus
+postStatusUpdate
+skipStatus:
+retryCount 2 eq
+?keepWorking
+escalateIncident
+return
+keepWorking:
+attemptRecovery
+closeIncident
+return
 `,
-    "deploy-pipeline.js": `async function deployRelease(release) {
-  buildArtifacts(release);
+    "greet-user.trk": `greet:
+>lastName
+>firstName
+"Hello Mr. " firstName concat lastName concat "?" concat say
+return
 
-  if (!testsPassed(release)) {
-    rollback(release);
-    return "tests_failed";
-  }
-
-  if (release.requiresApproval) {
-    requestApproval(release);
-  } else {
-    deployToProduction(release);
-  }
-
-  for (const region of release.regions) {
-    if (!healthCheck(region)) {
-      rollbackRegion(region);
-    }
-  }
-
-  return "complete";
-}
+main:
+"LeSueur" "Drew" greet
+return
 `,
   };
 
@@ -268,6 +245,11 @@ async function handleApi(req, res, requestUrl) {
 
       if (!filePath) {
         sendJson(res, 400, { error: "File name must use only letters, numbers, dot, underscore, or dash." });
+        return true;
+      }
+
+      if (!isTrickleScriptFileName(name)) {
+        sendJson(res, 400, { error: "File name must end in .trk or .trickle." });
         return true;
       }
 
@@ -300,6 +282,11 @@ async function handleApi(req, res, requestUrl) {
         return true;
       }
 
+      if (!isTrickleScriptFileName(name)) {
+        sendJson(res, 400, { error: "Only TrickleScript files are supported." });
+        return true;
+      }
+
       sendText(res, 200, fs.readFileSync(filePath, "utf8"));
       return true;
     }
@@ -312,6 +299,11 @@ async function handleApi(req, res, requestUrl) {
 
         if (!fs.existsSync(filePath)) {
           sendJson(res, 404, { error: "File not found." });
+          return true;
+        }
+
+        if (!isTrickleScriptFileName(name)) {
+          sendJson(res, 400, { error: "Only TrickleScript files are supported." });
           return true;
         }
 

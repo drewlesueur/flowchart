@@ -3,53 +3,52 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Flow Chart Detail</title>
+    <title>TrickleScript File</title>
     <link rel="stylesheet" href="/styles.css">
   </head>
   <body>
-    <div class="page-shell">
-      <header class="topbar">
+    <div class="app-shell">
+      <header class="app-header">
         <div>
-          <p class="eyebrow">Flow Chart Lab</p>
-          <h1 id="detailTitle">Flow chart detail</h1>
+          <p class="app-kicker">TrickleScript</p>
+          <h1 id="detailTitle">Flow file</h1>
         </div>
-        <div class="topbar-meta">
-          <a class="view-link" href="/">Back to files</a>
-          <div class="view-links" aria-label="Renderer views">
-            <button id="svgToggle" class="view-toggle is-active" type="button">SVG</button>
-            <button id="canvasToggle" class="view-toggle" type="button">Canvas</button>
-          </div>
-          <button id="saveFile" type="button">Save file</button>
-          <button id="resetSample" type="button">Reset file</button>
-          <p id="detailMeta">Loading file...</p>
+        <div class="app-header-side detail-actions">
+          <a class="ghost-link" href="/">Back to files</a>
+          <label class="entry-picker">
+            <span>Entry</span>
+            <select id="entrySelect"></select>
+          </label>
+          <button id="saveFile" type="button">Save</button>
+          <button id="resetSample" type="button" class="secondary-button">Reset</button>
+          <p id="detailMeta" class="app-status-copy">Loading file...</p>
         </div>
       </header>
 
-      <main class="workspace">
+      <main class="detail-layout">
         <section class="panel editor-panel">
-          <div class="panel-heading">
-            <h2>Source</h2>
+          <div class="panel-bar">
+            <h2>TrickleScript</h2>
             <p id="fileNameLabel">Code file</p>
           </div>
-          <textarea id="sourceInput" spellcheck="false" aria-label="Source code input"></textarea>
+          <textarea id="sourceInput" spellcheck="false" aria-label="TrickleScript source"></textarea>
         </section>
 
-        <section class="panel preview-panel">
-          <div class="panel-heading">
-            <h2 id="previewTitle">SVG Flow Chart</h2>
-            <p id="statusText">Ready.</p>
+        <section class="panel chart-panel">
+          <div class="panel-bar">
+            <h2>Flowchart</h2>
+            <p id="statusText">Ready</p>
           </div>
-          <div class="preview-scroll">
-            <div id="previewHost" class="svg-mount canvas-host" aria-live="polite">
+          <div class="chart-scroll">
+            <div id="previewHost" class="chart-host" aria-live="polite">
               <div id="svgMount"></div>
-              <canvas id="chartCanvas" hidden></canvas>
             </div>
           </div>
         </section>
       </main>
     </div>
 
-    <script src="/flowchart-core.js"></script>
+    <script src="/tricklescript.js"></script>
     <script src="/detail.js"></script>
   </body>
 </html>

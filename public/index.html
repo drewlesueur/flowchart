@@ -3,49 +3,49 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Flow Chart Lab</title>
+    <title>TrickleScript Flowchart</title>
     <link rel="stylesheet" href="/styles.css">
   </head>
   <body>
-    <div class="page-shell">
-      <header class="topbar topbar-home">
+    <div class="app-shell">
+      <header class="app-header">
         <div>
-          <p class="eyebrow">Flow Chart Lab</p>
-          <h1>Browse code files and open a flow chart detail view.</h1>
+          <p class="app-kicker">TrickleScript</p>
+          <h1>Pick a flow file and open it with a live flow chart.</h1>
         </div>
-        <div class="topbar-meta topbar-meta-home">
-          <p>The detail page lets you flip between SVG and Canvas rendering.</p>
+        <div class="app-header-side">
+          <p class="app-status-copy">The detail view shows the code on the left, the SVG flow chart on the right, and lets you save changes.</p>
         </div>
       </header>
 
-      <main class="library-layout">
-        <section class="library-intro panel">
-          <div class="panel-heading panel-heading-stack">
-            <h2>Code File Library</h2>
-            <p>Choose a sample file to inspect its control flow.</p>
+      <main class="home-layout">
+        <section class="panel intro-panel">
+          <div class="panel-bar">
+            <h2>What This Is</h2>
+            <p>TrickleScript-only flow workbench.</p>
           </div>
-          <div class="library-copy">
+          <div class="panel-body intro-copy">
             <p>
-              Each file opens in an editor-backed detail page where you can tweak the code, regenerate the chart,
-              and switch the renderer without leaving the page.
+              Every file in this list is treated as TrickleScript. Open one to edit the source, choose the entry routine,
+              regenerate the chart, and save the file back to disk.
             </p>
           </div>
         </section>
 
-        <section class="sample-list-panel panel">
-          <div class="panel-heading panel-heading-stack">
+        <section class="panel list-panel">
+          <div class="panel-bar">
             <h2>Files</h2>
-            <p id="listStatus">Loading sample files...</p>
+            <p id="listStatus">Loading files...</p>
           </div>
-          <form id="createFileForm" class="create-file-form">
-            <label class="field-label" for="newFileName">New file name</label>
-            <div class="create-file-row">
-              <input id="newFileName" name="newFileName" type="text" placeholder="example-flow.js" autocomplete="off">
-              <button type="submit">Create file</button>
+          <form id="createFileForm" class="create-form">
+            <label for="newFileName">New file name</label>
+            <div class="create-row">
+              <input id="newFileName" name="newFileName" type="text" placeholder="new-flow.trk" autocomplete="off">
+              <button type="submit">Create</button>
             </div>
-            <p id="createFileStatus" class="form-status">Use letters, numbers, `.`, `_`, and `-`.</p>
+            <p id="createFileStatus" class="helper-text">Use `.trk` or `.trickle`.</p>
           </form>
-          <div id="sampleList" class="sample-list" aria-live="polite"></div>
+          <div id="sampleList" class="file-list" aria-live="polite"></div>
         </section>
       </main>
     </div>
