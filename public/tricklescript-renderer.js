@@ -27,6 +27,9 @@
     const fromCy = from.y + from.h / 2;
     const toCx = to.x + to.w / 2;
     const toCy = to.y + to.h / 2;
+    const incomingCount = graph.edges.reduce((count, candidate) => {
+      return count + (candidate.to === edge.to ? 1 : 0);
+    }, 0);
 
     if (label === "Yes") {
       const startX = from.x + from.w + 15;
@@ -72,6 +75,13 @@
     }
 
     if (to.row <= from.row) {
+      const startX = from.x + from.w;
+      const startY = fromCy;
+      const laneX = Math.max(startX, to.x + to.w) + 34;
+      return { d: `M ${startX} ${startY} L ${laneX} ${startY} L ${laneX} ${toCy} L ${to.x + to.w} ${toCy}` };
+    }
+
+    if (incomingCount > 1) {
       const startX = from.x + from.w;
       const startY = fromCy;
       const laneX = Math.max(startX, to.x + to.w) + 34;
