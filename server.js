@@ -73,12 +73,18 @@ function ensureDirectory(directory) {
 }
 
 function sendJson(res, status, payload) {
-  res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
+  res.writeHead(status, {
+    "Content-Type": "application/json; charset=utf-8",
+    "Cache-Control": "no-store",
+  });
   res.end(JSON.stringify(payload));
 }
 
 function sendText(res, status, message) {
-  res.writeHead(status, { "Content-Type": "text/plain; charset=utf-8" });
+  res.writeHead(status, {
+    "Content-Type": "text/plain; charset=utf-8",
+    "Cache-Control": "no-store",
+  });
   res.end(message);
 }
 
@@ -515,7 +521,10 @@ const server = https.createServer(tlsOptions, (req, res) => {
 
         const extension = path.extname(filePath).toLowerCase();
         const contentType = MIME_TYPES[extension] || "application/octet-stream";
-        res.writeHead(200, { "Content-Type": contentType });
+        res.writeHead(200, {
+          "Content-Type": contentType,
+          "Cache-Control": "no-store",
+        });
         res.end(contents);
       });
     })
