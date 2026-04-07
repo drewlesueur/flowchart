@@ -363,7 +363,7 @@
         const node = {
           id: "n" + nodes.length,
           instructionIndex: i,
-          type: instruction.type === "otherwiseGoto" ? "decision" : (instruction.type === "return" ? "return" : "process"),
+          type: instruction.type === "otherwiseGoto" ? "decision" : "process",
           label: instruction.type === "otherwiseGoto" ? "Condition" : instruction.raw
         };
         if (instruction.type === "otherwiseGoto") {

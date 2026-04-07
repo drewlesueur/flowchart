@@ -185,13 +185,6 @@
           stroke: "#e9a645",
           "stroke-width": "2"
         }));
-      } else if (node.type === "return") {
-        svg.appendChild(el("polygon", {
-          points: `${x + 12},${y} ${x + w},${y} ${x + w - 12},${y + h} ${x},${y + h}`,
-          fill: "#16213e",
-          stroke: "#45e980",
-          "stroke-width": "2"
-        }));
       } else {
         svg.appendChild(el("rect", {
           x, y, width: w, height: h,

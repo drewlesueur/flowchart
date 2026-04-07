@@ -145,6 +145,20 @@ return
   assert.equal(jumpEdge.viaGoto, true);
 });
 
+test("buildFlowGraph renders return as a normal process node", () => {
+  const source = `
+main:
+doThing
+return
+`;
+
+  const graph = TrickleScript.buildFlowGraph(source, { entry: "main" });
+  const returnNode = graph.nodes.find((node) => node.label === "return");
+
+  assert.ok(returnNode);
+  assert.equal(returnNode.type, "process");
+});
+
 test("unknown goto labels are rejected", () => {
   const source = `
 main:
