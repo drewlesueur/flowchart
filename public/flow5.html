@@ -146,12 +146,16 @@ Node2
 
   const NODE_W = 220;
   const NODE_H = 74;
-  const HEADER_H = 16;
+  const HEADER_H = 18;
   const INNER_PAD_X = 1;
-  const INNER_PAD_Y = 1;
+  const INNER_PAD_Y = 3;
   const CHILD_GAP = 0;
   const ROOT_GAP = 24;
   const MARGIN = 56;
+  const LABEL_FONT = 10;
+  const LABEL_PILL_W = 104;
+  const LABEL_PILL_PAD_X = 8;
+  const LABEL_PILL_PAD_Y = 4;
 
   const camera = {
     zoom: 1,
@@ -291,18 +295,23 @@ Node2
     ctx.fill();
     ctx.stroke();
 
+    const pillX = screenX + projectL(LABEL_PILL_PAD_X * scale);
+    const pillY = screenY + projectL(LABEL_PILL_PAD_Y * scale);
+    const pillW = Math.min(width - projectL(LABEL_PILL_PAD_X * 2 * scale), projectL(LABEL_PILL_W * scale));
+    const pillH = headerH;
+
     ctx.fillStyle = "rgba(255,255,255,0.04)";
-    roundedRect(screenX + 4, screenY + 4, Math.min(width - 8, projectL(96 * scale)), Math.max(10, headerH), Math.max(5, radius * 0.45));
+    roundedRect(pillX, pillY, pillW, pillH, Math.max(5, radius * 0.45));
     ctx.fill();
 
-    ctx.font = `${Math.max(5, projectL(10 * scale))}px "Courier New", monospace`;
+    ctx.font = `${Math.max(5, projectL(LABEL_FONT * scale))}px "Courier New", monospace`;
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
     ctx.fillStyle = "#eef4ff";
     ctx.fillText(
-      truncate(node.label, Math.max(8, Math.floor(18 * scale))),
-      screenX + 8,
-      screenY + 4 + Math.max(10, headerH) / 2
+      truncate(node.label, 18),
+      pillX + projectL(8 * scale),
+      pillY + pillH / 2
     );
 
     if (remainingDepth <= 0 || !node.children.length) {
@@ -316,9 +325,9 @@ Node2
     }
 
     const innerX = x + INNER_PAD_X * scale;
-    const innerY = y + INNER_PAD_Y * scale;
+    const innerY = y + worldHeaderH + INNER_PAD_Y * scale;
     const innerW = worldWidth - INNER_PAD_X * 2 * scale;
-    const innerH = worldHeight - INNER_PAD_Y * 2 * scale;
+    const innerH = worldHeight - worldHeaderH - INNER_PAD_Y * 2 * scale;
     const intrinsicH = childIntrinsicHeight(node, remainingDepth);
     const heightScale = intrinsicH > 0 ? innerH / intrinsicH : scale;
     const widthScale = innerW / NODE_W;
