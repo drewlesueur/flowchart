@@ -76,7 +76,8 @@
       }
 
       #appleTarget,
-      #brokenAppleTarget {
+      #brokenAppleTarget,
+      #scriptAppleTarget {
         min-height: 260px;
         margin-top: 22px;
         display: grid;
@@ -159,6 +160,13 @@
         <p><a href="/broken-apple.svg" target="_blank" rel="noreferrer">Open the malformed .svg file</a></p>
         <button id="showBrokenAppleButton" type="button">Show broken apple</button>
         <div id="brokenAppleTarget" aria-live="polite"></div>
+      </div>
+
+      <div class="demo-block">
+        <h1>SVG Apple with script tag after it</h1>
+        <p>Click the button to inject an apple SVG followed by a <code>&lt;script&gt;</code> tag that changes the apple color to green.</p>
+        <button id="showScriptAppleButton" type="button">Show script apple</button>
+        <div id="scriptAppleTarget" aria-live="polite"></div>
       </div>
     </main>
     <script>
@@ -253,12 +261,71 @@
           ></path>
       `;
 
+      const scriptAppleMarkup = `
+        <svg viewBox="0 0 320 320" role="img" aria-label="An apple that a script turns green">
+          <defs>
+            <radialGradient id="appleFillScript" cx="35%" cy="28%" r="70%">
+              <stop offset="0%" stop-color="#ff8f7f"></stop>
+              <stop offset="45%" stop-color="#e64534"></stop>
+              <stop offset="100%" stop-color="#8f170f"></stop>
+            </radialGradient>
+            <radialGradient id="leafFillScript" cx="40%" cy="40%" r="70%">
+              <stop offset="0%" stop-color="#9ee576"></stop>
+              <stop offset="100%" stop-color="#3b8b2d"></stop>
+            </radialGradient>
+          </defs>
+          <ellipse class="apple-body" cx="160" cy="186" rx="88" ry="94" fill="url(#appleFillScript)"></ellipse>
+          <ellipse cx="134" cy="176" rx="55" ry="72" fill="rgba(255,255,255,0.12)"></ellipse>
+          <path
+            class="apple-body"
+            d="M159 108 C144 92, 116 88, 96 104 C74 122, 68 151, 72 186 C78 241, 111 279, 160 279 C209 279, 242 241, 248 186 C252 151, 246 122, 224 104 C204 88, 176 92, 161 108 Z"
+            fill="url(#appleFillScript)"
+            stroke="#7b120b"
+            stroke-width="4"
+            stroke-linejoin="round"
+          ></path>
+          <path
+            d="M157 106 C151 91, 154 70, 171 50"
+            fill="none"
+            stroke="#5c3413"
+            stroke-width="8"
+            stroke-linecap="round"
+          ></path>
+          <path
+            d="M171 56 C200 38, 237 42, 249 69 C217 84, 189 80, 171 56 Z"
+            fill="url(#leafFillScript)"
+            stroke="#2f6b26"
+            stroke-width="4"
+            stroke-linejoin="round"
+          ></path>
+          <path
+            d="M184 64 C203 69, 220 77, 233 88"
+            fill="none"
+            stroke="#2f6b26"
+            stroke-width="3"
+            stroke-linecap="round"
+          ></path>
+        </svg>
+        <script>
+          const target = document.getElementById("scriptAppleTarget");
+          const parts = target.querySelectorAll(".apple-body");
+          for (const part of parts) {
+            part.setAttribute("fill", "#58a84a");
+            part.setAttribute("stroke", "#2f6b26");
+          }
+        <\/script>
+      `;
+
       document.getElementById("showAppleButton").addEventListener("click", () => {
         document.getElementById("appleTarget").innerHTML = appleMarkup;
       });
 
       document.getElementById("showBrokenAppleButton").addEventListener("click", () => {
         document.getElementById("brokenAppleTarget").innerHTML = brokenAppleMarkup;
+      });
+
+      document.getElementById("showScriptAppleButton").addEventListener("click", () => {
+        document.getElementById("scriptAppleTarget").innerHTML = scriptAppleMarkup;
       });
     </script>
   </body>
