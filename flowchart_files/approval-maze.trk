@@ -1,0 +1,26 @@
+main:
+hasRequest true eq
+?noRequest
+needsManager true eq
+?skipManager
+askManager
+managerApproved true eq
+?managerRejected
+skipManager:
+needsSecurity true eq
+?skipSecurity
+askSecurity
+securityApproved true eq
+?securityRejected
+skipSecurity:
+shipIt
+return
+managerRejected:
+rework
+return
+securityRejected:
+auditTrail
+return
+noRequest:
+waitForRequest
+return

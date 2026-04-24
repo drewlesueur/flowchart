@@ -40,6 +40,7 @@ const PORT = Number(process.env.PORT || 3000);
 const CERT_FILE = process.env.CERT_FILE;
 const KEY_FILE = process.env.KEY_FILE;
 const FILES_DIR = process.env.FILES_DIR || "/home/ubuntu/flowchart_files";
+const DEFAULTS_DIR = process.env.DEFAULTS_DIR || path.join(__dirname, "flowchart_files");
 const PUBLIC_DIR = path.join(__dirname, "public");
 
 const MIME_TYPES = {
@@ -129,6 +130,47 @@ function resolveDataFile(name) {
   return resolved;
 }
 
+function resolveDefaultFile(name) {
+  if (!isAllowedFileName(name)) {
+    return null;
+  }
+
+  const root = path.normalize(DEFAULTS_DIR + path.sep);
+  const resolved = path.normalize(path.join(DEFAULTS_DIR, name));
+
+  if (!resolved.startsWith(root)) {
+    return null;
+  }
+
+  return resolved;
+}
+
+function readFileNames(directory) {
+  if (!fs.existsSync(directory)) {
+    return [];
+  }
+
+  return fs.readdirSync(directory, { withFileTypes: true })
+    .filter((entry) => entry.isFile())
+    .map((entry) => entry.name)
+    .filter((name) => isAllowedFileName(name));
+}
+
+function resolveReadableFile(name) {
+  const customPath = resolveDataFile(name);
+  const defaultPath = resolveDefaultFile(name);
+
+  if (customPath && fs.existsSync(customPath)) {
+    return customPath;
+  }
+
+  if (defaultPath && fs.existsSync(defaultPath)) {
+    return defaultPath;
+  }
+
+  return customPath;
+}
+
 function inferLanguage(name) {
   if (isTrickleScriptFileName(name)) {
     return "TrickleScript";
@@ -150,15 +192,15 @@ function summarizeContents(contents) {
 }
 
 function listCodeFiles() {
-  const names = fs.readdirSync(FILES_DIR, { withFileTypes: true })
-    .filter((entry) => entry.isFile())
-    .map((entry) => entry.name)
-    .filter((name) => isAllowedFileName(name))
+  const names = [...new Set([
+    ...readFileNames(DEFAULTS_DIR),
+    ...readFileNames(FILES_DIR),
+  ])]
     .filter((name) => isTrickleScriptFileName(name))
     .sort((a, b) => a.localeCompare(b));
 
   return names.map((name) => {
-    const filePath = resolveDataFile(name);
+    const filePath = resolveReadableFile(name);
     const contents = fs.readFileSync(filePath, "utf8");
     return {
       id: name,
@@ -167,233 +209,6 @@ function listCodeFiles() {
       description: summarizeContents(contents),
     };
   });
-}
-
-function seedDefaultFiles() {
-  const defaults = {
-    "order-fulfillment.trk": `main:
-orderPaid true eq
-?paymentHold
-orderHighValue true eq
-?standardReview
-approveOrder
-*afterReview
-standardReview:
-reviewOrder
-afterReview:
-itemsBackordered true eq
-?skipBackorderNotice
-notifyCustomer
-skipBackorderNotice:
-shipOrder
-return
-
-paymentHold:
-holdOrder
-return
-`,
-    "incident-triage.trk": `main:
-severity "critical" eq
-?nonCritical
-pageOnCall
-*afterSeverity
-nonCritical:
-createTicket
-afterSeverity:
-customerImpact true eq
-?skipStatus
-postStatusUpdate
-skipStatus:
-retryCount 2 eq
-?keepWorking
-escalateIncident
-return
-keepWorking:
-attemptRecovery
-closeIncident
-return
-`,
-    "greet-user.trk": `greet:
->lastName
->firstName
-"Hello Mr. " firstName concat lastName concat "?" concat say
-return
-
-main:
-"LeSueur" "Drew" greet
-return
-`,
-    "loop-countdown.trk": `main:
-count 3 eq
-?done
-tick
-count 2 eq
-?countWasTwo
-midLoopWork
-*afterTwoCheck
-countWasTwo:
-specialCase
-afterTwoCheck:
-*main
-done:
-finish
-return
-`,
-    "nested-branches.trk": `main:
-x 10 eq
-?outerElse
-leftStart
-y 20 eq
-?leftElse
-leftInnerStart
-z 30 eq
-?leftInnerElse
-leftInnerYes
-*afterInner
-leftInnerElse:
-leftInnerNo
-afterInner:
-*afterOuter
-leftElse:
-leftElseWork
-*afterOuter
-outerElse:
-rightStart
-q 40 eq
-?rightElse
-rightInnerStart
-*afterOuter
-rightElse:
-rightElseWork
-afterOuter:
-finish
-return
-`,
-    "approval-maze.trk": `main:
-hasRequest true eq
-?noRequest
-needsManager true eq
-?skipManager
-askManager
-managerApproved true eq
-?managerRejected
-skipManager:
-needsSecurity true eq
-?skipSecurity
-askSecurity
-securityApproved true eq
-?securityRejected
-skipSecurity:
-shipIt
-return
-managerRejected:
-rework
-return
-securityRejected:
-auditTrail
-return
-noRequest:
-waitForRequest
-return
-`,
-    "retry-loop.trk": `main:
-attempt
-success true eq
-?checkRetries
-done
-return
-checkRetries:
-retryCount 3 eq
-?tryAgain
-giveUp
-return
-tryAgain:
-logRetry
-*main
-`,
-    "diamond-stack.trk": `main:
-cond1 true eq
-?else1
-path1
-cond2 true eq
-?else2
-path2
-cond3 true eq
-?else3
-path3
-*afterAll
-else3:
-path3No
-*afterAll
-else2:
-path2No
-*afterAll
-else1:
-path1No
-afterAll:
-tailWork
-return
-`,
-    "return-sampler.trk": `main:
-firstCheck true eq
-?secondCheck
-firstPath
-return
-secondCheck:
-secondFlag false eq
-?fallback
-secondPath
-return
-fallback:
-lastThing
-return
-`,
-    "funky-join.trk": `main:
-prep
-alpha true eq
-?alphaElse
-alphaYes
-beta true eq
-?betaElse
-betaYes
-*joinPoint
-betaElse:
-betaNo
-*joinPoint
-alphaElse:
-alphaNo
-joinPoint:
-wrapUp
-return
-`,
-    "greeting-variations.trk": `formalGreeting:
->title
->lastName
-"Hello " title concat " " concat lastName concat say
-return
-
-casualGreeting:
->firstName
-"Hey " firstName concat say
-return
-
-main:
-useFormal true eq
-?useCasual
-"LeSueur" "Mr." formalGreeting
-return
-useCasual:
-"Drew" casualGreeting
-return
-`,
-  };
-
-  for (const [name, contents] of Object.entries(defaults)) {
-    const filePath = path.join(FILES_DIR, name);
-    if (!fs.existsSync(filePath)) {
-      fs.writeFileSync(filePath, contents, "utf8");
-    }
-  }
 }
 
 async function handleApi(req, res, requestUrl) {
@@ -420,7 +235,8 @@ async function handleApi(req, res, requestUrl) {
         return true;
       }
 
-      if (fs.existsSync(filePath)) {
+      const existingPath = resolveReadableFile(name);
+      if (existingPath && fs.existsSync(existingPath)) {
         sendJson(res, 409, { error: "A file with that name already exists." });
         return true;
       }
@@ -436,14 +252,16 @@ async function handleApi(req, res, requestUrl) {
 
   if (requestUrl.pathname.startsWith("/api/files/")) {
     const name = decodeURIComponent(requestUrl.pathname.slice("/api/files/".length));
-    const filePath = resolveDataFile(name);
+    const writablePath = resolveDataFile(name);
 
-    if (!filePath) {
+    if (!writablePath) {
       sendJson(res, 400, { error: "Invalid file name." });
       return true;
     }
 
     if (req.method === "GET") {
+      const filePath = resolveReadableFile(name);
+
       if (!fs.existsSync(filePath)) {
         sendJson(res, 404, { error: "File not found." });
         return true;
@@ -463,8 +281,9 @@ async function handleApi(req, res, requestUrl) {
         const body = await readRequestBody(req);
         const payload = body ? JSON.parse(body) : {};
         const content = typeof payload.content === "string" ? payload.content : "";
+        const existingPath = resolveReadableFile(name);
 
-        if (!fs.existsSync(filePath)) {
+        if (!existingPath || !fs.existsSync(existingPath)) {
           sendJson(res, 404, { error: "File not found." });
           return true;
         }
@@ -474,7 +293,7 @@ async function handleApi(req, res, requestUrl) {
           return true;
         }
 
-        fs.writeFileSync(filePath, content, "utf8");
+        fs.writeFileSync(writablePath, content, "utf8");
         sendJson(res, 200, { ok: true });
         return true;
       } catch (error) {
@@ -490,7 +309,6 @@ async function handleApi(req, res, requestUrl) {
 requireEnv("CERT_FILE", CERT_FILE);
 requireEnv("KEY_FILE", KEY_FILE);
 ensureDirectory(FILES_DIR);
-seedDefaultFiles();
 
 const tlsOptions = {
   cert: fs.readFileSync(CERT_FILE),

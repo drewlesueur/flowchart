@@ -1,0 +1,17 @@
+main:
+prep
+alpha true eq
+?alphaElse
+alphaYes
+beta true eq
+?betaElse
+betaYes
+*joinPoint
+betaElse:
+betaNo
+*joinPoint
+alphaElse:
+alphaNo
+joinPoint:
+wrapUp
+return

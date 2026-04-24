@@ -1,0 +1,37 @@
+main:
+x 10 eq
+?outerElse
+  inOuterYes
+  y 20 eq
+  ?leftElse
+    inLeftYes
+    z 30 eq
+    ?leftInnerElse
+      leftInnerYes
+      anotherLeftInner
+      *afterLeftInner
+    leftInnerElse:
+      leftInnerNo
+    afterLeftInner:
+    *afterOuter
+  leftElse:
+    inLeftNo
+    *afterOuter
+outerElse:
+  inOuterNo
+  q 40 eq
+  ?rightElse
+    inRightYes
+    r 50 eq
+    ?rightInnerElse
+      rightInnerYes
+      *afterRightInner
+    rightInnerElse:
+      rightInnerNo
+    afterRightInner:
+    *afterOuter
+  rightElse:
+    inRightNo
+afterOuter:
+finishUp
+return

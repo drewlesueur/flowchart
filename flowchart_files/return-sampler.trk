@@ -1,0 +1,13 @@
+main:
+firstCheck true eq
+?secondCheck
+firstPath
+return
+secondCheck:
+secondFlag false eq
+?fallback
+secondPath
+return
+fallback:
+lastThing
+return

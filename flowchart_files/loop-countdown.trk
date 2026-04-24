@@ -1,0 +1,15 @@
+main:
+count 3 eq
+?done
+tick
+count 2 eq
+?countWasTwo
+midLoopWork
+*afterTwoCheck
+countWasTwo:
+specialCase
+afterTwoCheck:
+*main
+done:
+finish
+return

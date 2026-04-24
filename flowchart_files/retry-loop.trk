@@ -1,0 +1,14 @@
+main:
+attempt
+success true eq
+?checkRetries
+done
+return
+checkRetries:
+retryCount 3 eq
+?tryAgain
+giveUp
+return
+tryAgain:
+logRetry
+*main

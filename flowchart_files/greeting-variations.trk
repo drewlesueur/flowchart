@@ -1,0 +1,19 @@
+formalGreeting:
+>title
+>lastName
+"Hello " title concat " " concat lastName concat say
+return
+
+casualGreeting:
+>firstName
+"Hey " firstName concat say
+return
+
+main:
+useFormal true eq
+?useCasual
+"LeSueur" "Mr." formalGreeting
+return
+useCasual:
+"Drew" casualGreeting
+return
