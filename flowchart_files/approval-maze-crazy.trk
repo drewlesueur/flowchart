@@ -1,0 +1,178 @@
+main:
+intakeRequest
+hasRequest true eq
+?archivePath
+needsLegal true eq
+?skipLegal
+legalReview
+legalApproved true eq
+?legalFix
+*riskGate
+skipLegal:
+fastTrack true eq
+?riskGate
+prepFastTrack
+*stakeholderGate
+legalFix:
+rewriteScope
+missingFacts true eq
+?riskGate
+collectEvidence
+*riskGate
+riskGate:
+riskTier "critical" eq
+?normalRisk
+openWarRoom
+needsSecurity true eq
+?stakeholderGate
+securityReview
+securityApproved true eq
+?securityFix
+*budgetGate
+normalRisk:
+riskTier "medium" eq
+?lowRisk
+assignAnalyst
+surpriseDependency true eq
+?budgetGate
+dependencyMapping
+*securityDetour
+lowRisk:
+lightReview
+legacySystem true eq
+?budgetGate
+legacyMitigation
+*securityDetour
+securityDetour:
+needsSecurity true eq
+?budgetGate
+securityReview
+securityApproved true eq
+?securityFix
+*budgetGate
+securityFix:
+patchPlan
+patchReady true eq
+?escalationHub
+applyPatch
+*budgetGate
+budgetGate:
+budgetOwnerMissing true eq
+?checkBudget
+huntBudgetOwner
+*stakeholderGate
+checkBudget:
+budgetApproved true eq
+?budgetFix
+reserveFunds
+*stakeholderGate
+budgetFix:
+costCutting
+canShrinkScope true eq
+?escalationHub
+trimScope
+*stakeholderGate
+stakeholderGate:
+vipStakeholder true eq
+?executiveGate
+notifyStakeholders
+stakeholderConcern true eq
+?executiveGate
+captureConcern
+concernType "legal" eq
+?concernOps
+legalReview
+*executiveGate
+concernOps:
+concernType "ops" eq
+?executiveGate
+opsPrep
+*executiveGate
+executiveGate:
+needsExecutive true eq
+?opsGate
+briefExecutive
+executiveApproved true eq
+?executiveFix
+*opsGate
+executiveFix:
+rewriteNarrative
+newChampion true eq
+?escalationHub
+briefChampion
+*opsGate
+opsGate:
+opsCapacity true eq
+?capacityFix
+scheduleLaunch
+docsReady true eq
+?docFix
+runChecklist
+checklistClean true eq
+?launchHold
+approveLaunch
+return
+capacityFix:
+borrowTeam
+borrowSucceeded true eq
+?escalationHub
+rescheduleWindow
+*docFix
+docFix:
+writeDocs
+docsReady true eq
+?launchHold
+runChecklist
+checklistClean true eq
+?launchHold
+approveLaunch
+return
+launchHold:
+openLaunchHold
+holdReason "security" eq
+?holdBudget
+securityReview
+*finalRetry
+holdBudget:
+holdReason "budget" eq
+?holdOps
+budgetApproved true eq
+?escalationHub
+reserveFunds
+*finalRetry
+holdOps:
+holdReason "ops" eq
+?escalationHub
+rescheduleWindow
+*finalRetry
+finalRetry:
+checklistClean true eq
+?escalationHub
+approveLaunch
+return
+escalationHub:
+executiveOverride true eq
+?boardPath
+grantOverride
+approveLaunch
+return
+boardPath:
+sendToBoard
+boardApproved true eq
+?archivePath
+boardConditions true eq
+?archivePath
+captureBoardConditions
+rewriteScope
+runChecklist
+approveLaunch
+return
+archivePath:
+archiveTemporarily
+reopenNextCycle true eq
+?closedForever
+refreshRequest
+return
+closedForever:
+closeRequest
+return
